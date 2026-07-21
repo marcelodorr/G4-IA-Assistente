@@ -1,0 +1,24 @@
+{
+  "name": "g4-ia-assistente",
+  "version": "0.1.0",
+  "description": "Instala o G4 IA Assistente na sua conta Railway",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "g4-ia-assistente": "./dist/index.js" },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": { "build": "tsc", "test": "vitest run", "prepublishOnly": "npm run build" },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "cross-spawn": "^7.0.6",
+    "open": "^10.1.0",
+    "picocolors": "^1.1.0",
+    "tar": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
