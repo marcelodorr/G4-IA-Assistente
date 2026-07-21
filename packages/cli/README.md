@@ -30,6 +30,21 @@ Siga as instruções interativas. Ao final, o navegador abre automaticamente na 
 7. Anexa um volume persistente ao serviço da aplicação (`/data`).
 8. Faz o deploy, gera o domínio público e abre o navegador em `/setup` para você concluir a configuração (chave da OpenAI, usuário admin, etc.).
 
+## Uso por agentes de IA / não-interativo
+
+Se este comando for executado por um agente de IA (ex.: Claude Code) ou em qualquer terminal sem TTY, o wizard interativo não funciona — nesse caso a CLI imprime uma orientação em vez de travar esperando input. O caminho recomendado para agentes é rodar direto no modo não-interativo:
+
+```bash
+npx g4-ia-assistente --yes --nome <nome-do-projeto>
+```
+
+- `--nome <nome>`: nome do projeto no Railway (letras minúsculas, números e hífens, 3-40 caracteres).
+- `--yes` / `-y`: pula todas as perguntas. Sem `--nome`, usa `g4-ia-assistente` como padrão.
+- Passar apenas `--nome` (sem `--yes`) também ativa o modo não-interativo — a intenção já fica clara.
+- `--help` / `-h`: mostra a ajuda.
+
+Nesse modo a CLI não abre o navegador ao final (não faz sentido em um agente ou servidor); em vez disso, imprime a URL do assistente e a instrução `Acesse <url>/setup para concluir a configuração.`. Se já existir uma instalação vinculada, o mesmo comando atualiza e refaz o deploy automaticamente, sem perguntar.
+
 ## Atualizando uma instalação existente
 
 Rode o mesmo comando novamente:

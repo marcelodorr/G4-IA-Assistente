@@ -64,6 +64,8 @@ O instalador vai perguntar o nome do projeto e, em seguida, fazer tudo sozinho:
 
 Esse processo leva alguns minutos — o deploy inicial da aplicação é a etapa mais demorada.
 
+> Se você usa um agente de IA (ex.: Claude Code), peça a ele para rodar `npx g4-ia-assistente --yes --nome <nome>`.
+
 ## Passo 5 — Concluir o wizard de configuração
 
 Quando o navegador abrir em `/setup`, você vai preencher 3 passos:
