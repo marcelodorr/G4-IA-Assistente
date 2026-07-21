@@ -138,17 +138,18 @@ docker-compose.yml
 }
 ```
 
-- [ ] **Step 5: Verificar build e execução local**
+- [ ] **Step 5: Verificar build e execução local (opcional — só se houver Docker na máquina)**
 
 ```bash
 docker build -t g4-ia-app .
 docker run --rm -p 3000:3000 \
-  -e DATABASE_URL="postgres://postgres:postgres@host.docker.internal:5432/g4" \
+  -e DATABASE_URL="<TEST_DATABASE_URL do .env (Railway)>" \
   -e AUTH_SECRET=dev -e ENCRYPTION_KEY=$(printf 'a%.0s' {1..64}) \
   -e DATA_DIR=/tmp/data -e AUTH_TRUST_HOST=true \
   g4-ia-app
 ```
 Esperado: log "migrations ok", server no ar; `curl localhost:3000/api/health` → `{"ok":true}`.
+Sem Docker local, a validação definitiva acontece no primeiro deploy real via CLI (Task 20, Step 8) — o Railway builda o Dockerfile na nuvem.
 
 - [ ] **Step 6: Commit** — `git add -A && git commit -m "feat: build de produção com Docker, migrations no boot e healthcheck"`
 
@@ -618,29 +619,36 @@ http.createServer((req, res) => {
 
 - [ ] **Step 3: Config e global setup**
 
-`apps/web/e2e/global-setup.ts` — cria/reseta o banco `g4_e2e` e roda migrations:
+`apps/web/e2e/global-setup.ts` — cria/reseta o banco `g4_e2e` (no Postgres de dev do Railway) e roda migrations. `E2E_DATABASE_URL` deve apontar para o banco `g4_e2e` no mesmo servidor do `.env`:
 ```ts
 import { execSync } from "child_process";
 import postgres from "postgres";
 
 export default async function globalSetup() {
-  const admin = postgres("postgres://postgres:postgres@localhost:5432/postgres");
+  const url = process.env.E2E_DATABASE_URL!;
+  const admin = postgres(url.replace(/\/[^/]+$/, "/postgres"));
   await admin.unsafe(`DROP DATABASE IF EXISTS g4_e2e WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE g4_e2e`);
   await admin.end();
   execSync("npx drizzle-kit migrate", {
     cwd: __dirname + "/..",
-    env: { ...process.env, DATABASE_URL: "postgres://postgres:postgres@localhost:5432/g4_e2e" },
+    env: { ...process.env, DATABASE_URL: url },
     stdio: "inherit",
   });
 }
 ```
 
-`apps/web/playwright.config.ts`:
+`apps/web/playwright.config.ts` (carrega o `.env` como o vitest.config, via `process.loadEnvFile`, e define `E2E_DATABASE_URL` derivada da `TEST_DATABASE_URL` trocando o nome do banco por `g4_e2e` se a env não vier definida):
 ```ts
 import { defineConfig } from "@playwright/test";
+import { existsSync } from "fs";
+import path from "path";
 
-const E2E_DB = "postgres://postgres:postgres@localhost:5432/g4_e2e";
+const envFile = path.resolve(__dirname, ".env");
+if (existsSync(envFile)) process.loadEnvFile(envFile);
+const E2E_DB = process.env.E2E_DATABASE_URL
+  ?? process.env.TEST_DATABASE_URL!.replace(/\/[^/]+$/, "/g4_e2e");
+process.env.E2E_DATABASE_URL = E2E_DB;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -704,7 +712,7 @@ test("setup → chat com streaming", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 5: Rodar** — `docker compose up -d db && npm run e2e -w apps/web` → esperado: 1 passed. Ajustar seletores conforme a UI real se algum falhar (rodar com `--ui` para depurar).
+- [ ] **Step 5: Rodar** — `npm run e2e -w apps/web` (usa o Postgres de dev do Railway via `.env`) → esperado: 1 passed. Ajustar seletores conforme a UI real se algum falhar (rodar com `--ui` para depurar).
 
 - [ ] **Step 6: Commit** — `git add -A && git commit -m "test: smoke e2e do fluxo setup → chat com OpenAI mockada"`
 
