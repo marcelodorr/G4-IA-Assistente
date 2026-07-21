@@ -7,7 +7,9 @@ import { getProvider } from "@/lib/ai/provider";
 import { prepareModelMessages } from "@/lib/ai/prepare-messages";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { generateConversationTitle } from "@/lib/ai/title";
+import { makeKnowledgeTool } from "@/lib/ai/knowledge-tool";
 import { assistants } from "@/lib/db/schema";
+import { hasReadyFiles } from "@/lib/rag/search";
 import { eq } from "drizzle-orm";
 
 export const maxDuration = 300;
@@ -26,12 +28,19 @@ export const POST = apiHandler(async (req) => {
     : null;
   const modelId = got.conversation.model ?? assistant?.model ?? settings.defaultModel;
 
+  const temBase = assistant ? await hasReadyFiles(db, assistant.id) : false;
+  const tools = temBase && assistant ? { buscarConhecimento: makeKnowledgeTool(db, openai, assistant.id) } : undefined;
+  const systemExtra = temBase
+    ? "\n\nVocê tem acesso à tool buscarConhecimento com documentos enviados pelo administrador. Consulte-a antes de responder perguntas factuais sobre o negócio e cite o arquivo de origem."
+    : "";
+
   const result = streamText({
     // .chat() força a API de chat completions (necessário para o mock do e2e da Parte 2)
     model: openai.chat(modelId),
-    system: assistant?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+    system: (assistant?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT) + systemExtra,
     messages: await prepareModelMessages(uiMessages),
     stopWhen: stepCountIs(5),
+    tools,
   });
 
   return result.toUIMessageStreamResponse({
