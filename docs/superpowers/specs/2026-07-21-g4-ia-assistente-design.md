@@ -57,7 +57,7 @@ Workspaces npm. A CLI é publicada a partir deste mesmo repositório.
 - **assistant_files** — assistant_id, nome do arquivo, mime, tamanho, caminho no volume, status (`pending → processing → ready | error`), mensagem de erro.
 - **chunks** — file_id, assistant_id (desnormalizado para busca), conteúdo, `embedding vector(1536)`, chunk_index. Índice HNSW (cosseno).
 - **conversations** — user_id, assistant_id (opcional), título (gerado automaticamente após primeira troca), modelo, timestamps.
-- **messages** — conversation_id, role (`user` | `assistant`), conteúdo (texto), anexos jsonb (`[{path, mime, nome}]`), timestamps.
+- **messages** — conversation_id, role (`user` | `assistant`), parts jsonb (formato UIMessage do AI SDK, texto + anexos), timestamps.
 
 Migrations com drizzle-kit, executadas no start do serviço (entrypoint). Primeira migration inclui `CREATE EXTENSION IF NOT EXISTS vector`.
 
