@@ -12,18 +12,19 @@ export const authConfig = {
         || pathname.startsWith("/invite/")
         || pathname.startsWith("/api/setup")
         || pathname.startsWith("/api/invites/accept")
+        || pathname.startsWith("/api/auth")
         || pathname.startsWith("/api/health")
         || pathname.startsWith("/brand/");
       if (publica) return true;
       return Boolean(auth?.user);
     },
     jwt({ token, user }) {
-      if (user) { token.id = (user as any).id; token.role = (user as any).role; }
+      if (user) { token.id = user.id; token.role = user.role; }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id as string;
-      (session.user as any).role = token.role as "admin" | "member";
+      session.user.role = token.role as "admin" | "member";
       return session;
     },
   },
