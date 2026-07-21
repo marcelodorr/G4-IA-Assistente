@@ -37,14 +37,18 @@ export const POST = apiHandler(async (req) => {
   return result.toUIMessageStreamResponse({
     originalMessages: uiMessages,
     onFinish: async ({ messages: finalMessages }) => {
-      const persistable = finalMessages
-        .filter((m: any) => m.role === "user" || m.role === "assistant")
-        .map((m: any) => ({ role: m.role, parts: m.parts }));
-      await replaceMessages(db, conversationId, persistable);
-      if (!got.conversation.title) {
-        const firstText = (uiMessages[0]?.parts ?? []).find((p: any) => p.type === "text")?.text ?? "Nova conversa";
-        const title = await generateConversationTitle(openai.chat(settings.defaultModel), firstText).catch(() => null);
-        if (title) await setConversationTitle(db, conversationId, title);
+      try {
+        const persistable = finalMessages
+          .filter((m: any) => m.role === "user" || m.role === "assistant")
+          .map((m: any) => ({ role: m.role, parts: m.parts }));
+        await replaceMessages(db, conversationId, persistable);
+        if (!got.conversation.title) {
+          const firstText = (uiMessages[0]?.parts ?? []).find((p: any) => p.type === "text")?.text ?? "Nova conversa";
+          const title = await generateConversationTitle(openai.chat(settings.defaultModel), firstText).catch(() => null);
+          if (title) await setConversationTitle(db, conversationId, title);
+        }
+      } catch (e) {
+        console.error("[chat] falha ao persistir conversa", conversationId, e);
       }
     },
   });
