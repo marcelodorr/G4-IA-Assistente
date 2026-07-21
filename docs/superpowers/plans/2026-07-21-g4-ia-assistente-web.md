@@ -812,6 +812,7 @@ export const authConfig = {
       const { pathname } = request.nextUrl;
       const publica = ["/login", "/setup"].some((p) => pathname.startsWith(p))
         || pathname.startsWith("/invite/")
+        || pathname.startsWith("/api/auth")      // endpoints internos do NextAuth (csrf/session/callback)
         || pathname.startsWith("/api/setup")
         || pathname.startsWith("/api/invites/accept")
         || pathname.startsWith("/api/health")
@@ -820,12 +821,12 @@ export const authConfig = {
       return Boolean(auth?.user);
     },
     jwt({ token, user }) {
-      if (user) { token.id = (user as any).id; token.role = (user as any).role; }
+      if (user) { token.id = user.id; token.role = user.role; }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id as string;
-      (session.user as any).role = token.role as "admin" | "member";
+      session.user.role = token.role as "admin" | "member";
       return session;
     },
   },
