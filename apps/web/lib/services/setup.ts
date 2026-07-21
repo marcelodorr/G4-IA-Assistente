@@ -23,13 +23,17 @@ export async function completeSetup(db: Db, input: SetupInput, deps = { validate
   if (!input.name.trim() || !input.email.includes("@")) throw new Error("Nome ou e-mail inválido");
   if (!(await deps.validateKey(input.openaiKey.trim()))) throw new Error("Chave OpenAI inválida — verifique e tente novamente");
 
-  await db.insert(users).values({
-    name: input.name.trim(),
-    email: input.email.trim().toLowerCase(),
-    passwordHash: await hashPassword(input.password),
-    role: "admin",
+  const passwordHash = await hashPassword(input.password);
+  // Transacional: se qualquer passo falhar (ex.: modelo inválido), nada fica meio-configurado.
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      passwordHash,
+      role: "admin",
+    });
+    await saveOpenAIKey(tx, input.openaiKey);
+    await setDefaultModel(tx, input.defaultModel);
+    await markSetupCompleted(tx);
   });
-  await saveOpenAIKey(db, input.openaiKey);
-  await setDefaultModel(db, input.defaultModel);
-  await markSetupCompleted(db);
 }

@@ -18,7 +18,7 @@ describe("crypto", () => {
 
   it("falha se o payload for adulterado", () => {
     const p = encrypt("segredo");
-    const [iv, data, tag] = p.split(".");
+    const [iv, , tag] = p.split(".");
     const tampered = [iv, Buffer.from("aaaa").toString("base64"), tag].join(".");
     expect(() => decrypt(tampered)).toThrow();
   });

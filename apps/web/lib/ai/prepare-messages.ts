@@ -21,12 +21,12 @@ const defaultDeps: Deps = {
 };
 
 export async function prepareModelMessages(uiMessages: UIMessage[], deps: Deps = defaultDeps): Promise<ModelMessage[]> {
-  const transformed = [] as UIMessage[];
+  const transformed: UIMessage[] = [];
   for (const msg of uiMessages) {
-    const parts: any[] = [];
-    for (const part of msg.parts as any[]) {
+    const parts: UIMessage["parts"] = [];
+    for (const part of msg.parts) {
       if (part.type !== "file") { parts.push(part); continue; }
-      if (!part.url?.startsWith("/api/files/")) continue; // descarta URLs externas
+      if (!part.url.startsWith("/api/files/")) continue; // descarta URLs externas
       const storedName = part.url.slice("/api/files/".length);
       const { buf, mime } = await deps.readFile(storedName);
       if (mime === "application/pdf") {

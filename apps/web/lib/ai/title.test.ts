@@ -26,12 +26,12 @@ function mockModel(text: string) {
 
 describe("generateConversationTitle", () => {
   it("retorna título limpo", async () => {
-    const t = await generateConversationTitle(mockModel('"Plano de vendas Q3"\n') as any, "me ajude com vendas");
+    const t = await generateConversationTitle(mockModel('"Plano de vendas Q3"\n'), "me ajude com vendas");
     expect(t).toBe("Plano de vendas Q3");
   });
 
   it("trunca títulos longos em 60 chars", async () => {
-    const t = await generateConversationTitle(mockModel("x".repeat(200)) as any, "oi");
+    const t = await generateConversationTitle(mockModel("x".repeat(200)), "oi");
     expect(t.length).toBeLessThanOrEqual(60);
   });
 });

@@ -40,10 +40,13 @@ npx g4-ia-assistente
 
 A CLI detecta a instalação existente, pergunta se você quer atualizar e, se confirmado, baixa a versão mais recente do código e refaz o deploy (`railway up`) — sem recriar o projeto, o banco ou os serviços.
 
+Isso só é seguro quando a instalação anterior terminou com sucesso. Se a primeira instalação falhou no meio do caminho (nunca chegou a imprimir o endereço público), a re-execução **não** retoma o provisionamento de onde parou — como um projeto já ficou vinculado localmente, a CLI tentaria apenas atualizar esse projeto incompleto. Nesse caso, apague o projeto incompleto no [painel do Railway](https://railway.app/dashboard) e rode `npx g4-ia-assistente` de novo do zero.
+
 ## Solução de problemas
 
 - **"Você não está logado na Railway CLI"**: rode `railway login` e execute o comando novamente.
 - **"A Railway CLI não está instalada"**: instale com `npm install -g @railway/cli` (ou `brew install railway` no mac).
 - **Build ou deploy falhou no Railway**: veja os logs do serviço com `railway logs` (dentro da pasta `~/.g4-ia-assistente/app`, ou com `railway logs --service app` de qualquer lugar depois de linkar o projeto).
 - **Erro ao baixar o código**: verifique sua conexão com a internet e tente novamente.
-- Se o problema persistir, rode a CLI novamente — os passos já concluídos no Railway não são recriados — ou entre em contato com o suporte do G4.
+- **A instalação falhou antes de terminar**: apague o projeto incompleto no [painel do Railway](https://railway.app/dashboard) e rode `npx g4-ia-assistente` de novo — não tente apenas rodar o comando de novo por cima, veja o aviso acima.
+- Se o problema persistir, entre em contato com o suporte do G4.

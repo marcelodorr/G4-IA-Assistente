@@ -1,8 +1,6 @@
 "use client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { listAssistants } from "@/lib/services/assistants";
-
-type AssistantRow = Awaited<ReturnType<typeof listAssistants>>[number];
+import type { AssistantSummary } from "@/lib/services/assistants";
 
 // Valor sentinela do item "Chat livre" (sem assistente) no <Select>, que exige
 // strings não vazias para cada item.
@@ -13,7 +11,7 @@ export function AssistantPicker({
   value,
   onChange,
 }: {
-  assistants: AssistantRow[];
+  assistants: AssistantSummary[];
   value: string | null;
   onChange: (assistantId: string | null) => void;
 }) {

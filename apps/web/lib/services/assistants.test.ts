@@ -2,11 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { createAssistant, updateAssistant, listAssistants, deleteAssistant } from "./assistants";
 import { users } from "@/lib/db/schema";
+import type { Db } from "@/lib/db";
 
 describe.skipIf(!process.env.TEST_DATABASE_URL)("assistants", () => {
   beforeEach(truncateAll);
 
-  async function admin(db: any) {
+  async function admin(db: Db) {
     const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x", role: "admin" }).returning();
     return u;
   }

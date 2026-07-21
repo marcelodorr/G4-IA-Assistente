@@ -1,4 +1,4 @@
-import { stepCountIs, streamText } from "ai";
+import { stepCountIs, streamText, isTextUIPart, type UIMessage } from "ai";
 import { db } from "@/lib/db";
 import { apiHandler, requireSession } from "@/lib/services/guards";
 import { getConversation, replaceMessages, setConversationTitle } from "@/lib/services/conversations";
@@ -14,9 +14,11 @@ import { eq } from "drizzle-orm";
 
 export const maxDuration = 300;
 
+type ChatRequestBody = { messages: UIMessage[]; conversationId: string };
+
 export const POST = apiHandler(async (req) => {
   const session = await requireSession();
-  const { messages: uiMessages, conversationId } = await req.json();
+  const { messages: uiMessages, conversationId } = (await req.json()) as ChatRequestBody;
 
   const got = await getConversation(db, conversationId, session.user.id);
   if (!got) return Response.json({ error: "Conversa não encontrada" }, { status: 404 });
@@ -45,14 +47,14 @@ export const POST = apiHandler(async (req) => {
 
   return result.toUIMessageStreamResponse({
     originalMessages: uiMessages,
-    onFinish: async ({ messages: finalMessages }) => {
+    onEnd: async ({ messages: finalMessages }) => {
       try {
         const persistable = finalMessages
-          .filter((m: any) => m.role === "user" || m.role === "assistant")
-          .map((m: any) => ({ role: m.role, parts: m.parts }));
+          .filter((m): m is UIMessage & { role: "user" | "assistant" } => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, parts: m.parts }));
         await replaceMessages(db, conversationId, persistable);
         if (!got.conversation.title) {
-          const firstText = (uiMessages[0]?.parts ?? []).find((p: any) => p.type === "text")?.text ?? "Nova conversa";
+          const firstText = (uiMessages[0]?.parts ?? []).find(isTextUIPart)?.text ?? "Nova conversa";
           const title = await generateConversationTitle(openai.chat(settings.defaultModel), firstText).catch(() => null);
           if (title) await setConversationTitle(db, conversationId, title);
         }

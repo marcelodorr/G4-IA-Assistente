@@ -9,7 +9,9 @@ export const POST = apiHandler(async (req) => {
   const { email, role = "member" } = await req.json();
   if (!email?.includes("@")) return Response.json({ error: "E-mail inválido" }, { status: 400 });
   const { token } = await createInvite(db, { email, role });
-  const base = new URL(req.url).origin;
+  const proto = req.headers.get("x-forwarded-proto");
+  const host = req.headers.get("x-forwarded-host");
+  const base = proto && host ? `${proto}://${host}` : new URL(req.url).origin;
   return Response.json({ url: `${base}/invite/${token}` });
 });
 

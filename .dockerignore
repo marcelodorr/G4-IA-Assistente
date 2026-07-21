@@ -2,8 +2,9 @@ node_modules
 **/node_modules
 .next
 .git
-data
+**/data
 docs
 packages
 *.md
-.env*
+**/.env*
+**/*.tsbuildinfo

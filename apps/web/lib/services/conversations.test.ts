@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { createConversation, listConversations, getConversation, replaceMessages, deleteConversation } from "./conversations";
 import { users } from "@/lib/db/schema";
+import type { Db } from "@/lib/db";
 
-async function makeUser(db: any, email = "u@g4.com") {
+async function makeUser(db: Db, email = "u@g4.com") {
   const [u] = await db.insert(users).values({ name: "U", email, passwordHash: "x" }).returning();
   return u;
 }

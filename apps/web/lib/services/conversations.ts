@@ -28,6 +28,7 @@ export async function deleteConversation(db: Db, id: string, userId: string) {
 
 type UiMsg = { role: "user" | "assistant"; parts: unknown };
 
+/** O chamador DEVE validar a propriedade da conversa (getConversation) antes. */
 export async function replaceMessages(db: Db, conversationId: string, uiMessages: UiMsg[]) {
   await db.transaction(async (tx) => {
     await tx.delete(messages).where(eq(messages.conversationId, conversationId));
@@ -42,6 +43,7 @@ export async function replaceMessages(db: Db, conversationId: string, uiMessages
   });
 }
 
+/** O chamador DEVE validar a propriedade da conversa (getConversation) antes. */
 export async function setConversationTitle(db: Db, id: string, title: string) {
   await db.update(conversations).set({ title }).where(eq(conversations.id, id));
 }

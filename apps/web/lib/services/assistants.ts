@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { assistants } from "@/lib/db/schema";
+import { isAllowedModel } from "@/lib/ai/models";
 import type { Db } from "@/lib/db";
 
 type CreateInput = { name: string; systemPrompt: string; description?: string; model?: string | null; createdBy: string };
@@ -7,6 +8,7 @@ type CreateInput = { name: string; systemPrompt: string; description?: string; m
 export async function createAssistant(db: Db, input: CreateInput) {
   if (!input.name.trim()) throw new Error("Nome do assistente é obrigatório");
   if (!input.systemPrompt.trim()) throw new Error("System prompt é obrigatório");
+  if (input.model && !isAllowedModel(input.model)) throw new Error("Modelo inválido");
   const [row] = await db.insert(assistants).values({
     name: input.name.trim(), systemPrompt: input.systemPrompt,
     description: input.description ?? null, model: input.model ?? null, createdBy: input.createdBy,
@@ -17,6 +19,7 @@ export async function createAssistant(db: Db, input: CreateInput) {
 export async function updateAssistant(db: Db, id: string, patch: Partial<CreateInput & { active: boolean }>) {
   if (patch.name !== undefined && !patch.name.trim()) throw new Error("Nome do assistente é obrigatório");
   if (patch.systemPrompt !== undefined && !patch.systemPrompt.trim()) throw new Error("System prompt é obrigatório");
+  if (patch.model && !isAllowedModel(patch.model)) throw new Error("Modelo inválido");
   await db.update(assistants).set(patch).where(eq(assistants.id, id));
 }
 
@@ -32,3 +35,6 @@ export async function getAssistant(db: Db, id: string) {
 export async function deleteAssistant(db: Db, id: string) {
   await db.delete(assistants).where(eq(assistants.id, id));
 }
+
+// Forma reduzida exposta a usuários não-admin (sem `systemPrompt`) — ver app/api/assistants/route.ts.
+export type AssistantSummary = Pick<Awaited<ReturnType<typeof listAssistants>>[number], "id" | "name" | "description">;

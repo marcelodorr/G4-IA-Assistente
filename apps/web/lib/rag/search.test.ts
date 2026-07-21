@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { searchChunks, hasReadyFiles } from "./search";
 import { users, assistants, assistantFiles, chunks } from "@/lib/db/schema";
+import type { Db } from "@/lib/db";
 
 function vec(hotIndex: number): number[] {
   const v = new Array(1536).fill(0); v[hotIndex] = 1; return v;
@@ -10,7 +11,7 @@ function vec(hotIndex: number): number[] {
 describe.skipIf(!process.env.TEST_DATABASE_URL)("searchChunks", () => {
   beforeEach(truncateAll);
 
-  async function seed(db: any) {
+  async function seed(db: Db) {
     const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x" }).returning();
     const [a] = await db.insert(assistants).values({ name: "V", systemPrompt: "sp", createdBy: u.id }).returning();
     const [f] = await db.insert(assistantFiles).values({
@@ -35,7 +36,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("searchChunks", () => {
 
   it("não vaza chunks de outro assistente", async () => {
     const db = await getTestDb();
-    const a = await seed(db);
+    await seed(db);
     const [u2] = await db.insert(users).values({ name: "B", email: "b@g4.com", passwordHash: "x" }).returning();
     const [outro] = await db.insert(assistants).values({ name: "O", systemPrompt: "sp", createdBy: u2.id }).returning();
     expect(await searchChunks(db, outro.id, vec(0))).toHaveLength(0);

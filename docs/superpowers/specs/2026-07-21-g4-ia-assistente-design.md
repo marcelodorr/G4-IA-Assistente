@@ -34,7 +34,7 @@ Workspaces npm. A CLI é publicada a partir deste mesmo repositório.
 | Framework | Next.js 15 (App Router, TypeScript) — FE + BE num só serviço |
 | UI | Tailwind CSS v4 + shadcn/ui |
 | Auth | Auth.js (NextAuth v5), provider Credentials (e-mail/senha), sessões JWT |
-| Senhas | argon2id (fallback bcrypt se houver problema de build nativo no Railway) |
+| Senhas | argon2id planejado; **decisão final registrada no plano:** bcryptjs (o build nativo do argon2 se mostrou instável no container do Railway) |
 | Banco | PostgreSQL + extensão pgvector; ORM Drizzle (coluna `vector` nativa) |
 | IA | Vercel AI SDK + `@ai-sdk/openai` — streaming, tool calling, embeddings `text-embedding-3-small` (1536 dims) |
 | Parsing | `unpdf` (PDF), SheetJS/`xlsx` (Excel) |

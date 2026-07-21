@@ -93,7 +93,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("POST /api/chat (integração co
       }),
     });
 
-    const response = await POST(request, {});
+    const response = await POST(request, { params: Promise.resolve({}) });
     const bodyText = await response.text();
     if (response.status !== 200) {
       throw new Error(`POST /api/chat retornou ${response.status}: ${bodyText}`);

@@ -13,8 +13,9 @@ export const PATCH = apiHandler(async (req) => {
   await requireAdmin();
   const { openaiKey, defaultModel } = await req.json();
   if (openaiKey) {
-    if (!(await validateOpenAIKey(openaiKey))) return Response.json({ error: "Chave OpenAI inválida" }, { status: 400 });
-    await saveOpenAIKey(db, openaiKey);
+    const key = openaiKey.trim();
+    if (!(await validateOpenAIKey(key))) return Response.json({ error: "Chave OpenAI inválida" }, { status: 400 });
+    await saveOpenAIKey(db, key);
   }
   if (defaultModel) await setDefaultModel(db, defaultModel);
   return new Response(null, { status: 204 });

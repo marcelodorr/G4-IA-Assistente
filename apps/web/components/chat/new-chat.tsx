@@ -6,15 +6,13 @@ import { Logo } from "@/components/brand/logo";
 import { AssistantPicker } from "./assistant-picker";
 import { ModelPicker } from "./model-picker";
 import { MessageInput, type Attachment } from "./message-input";
-import type { listAssistants } from "@/lib/services/assistants";
-
-type AssistantRow = Awaited<ReturnType<typeof listAssistants>>[number];
+import type { AssistantSummary } from "@/lib/services/assistants";
 
 export function NewChat({
   assistants,
   defaultModel,
 }: {
-  assistants: AssistantRow[];
+  assistants: AssistantSummary[];
   defaultModel: string;
 }) {
   const router = useRouter();

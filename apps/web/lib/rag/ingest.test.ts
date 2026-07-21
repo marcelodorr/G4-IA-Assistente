@@ -6,6 +6,7 @@ import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { ingestFile } from "./ingest";
 import { users, assistants, assistantFiles, chunks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import type { Db } from "@/lib/db";
 
 const fakeEmbed = async (texts: string[]) => texts.map((_, i) => {
   const v = new Array(1536).fill(0); v[i % 1536] = 1; return v;
@@ -17,7 +18,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("ingestFile", () => {
     process.env.DATA_DIR = mkdtempSync(path.join(tmpdir(), "g4-ingest-"));
   });
 
-  async function seed(db: any, storedName: string) {
+  async function seed(db: Db, storedName: string) {
     const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x", role: "admin" }).returning();
     const [a] = await db.insert(assistants).values({ name: "V", systemPrompt: "sp", createdBy: u.id }).returning();
     const [f] = await db.insert(assistantFiles).values({

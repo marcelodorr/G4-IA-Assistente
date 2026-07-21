@@ -3,9 +3,16 @@ import { createAssistant, listAssistants } from "@/lib/services/assistants";
 import { apiHandler, requireAdmin, requireSession } from "@/lib/services/guards";
 
 export const GET = apiHandler(async (req) => {
-  await requireSession();
+  const session = await requireSession();
   const onlyActive = new URL(req.url).searchParams.get("active") === "1";
-  return Response.json(await listAssistants(db, { onlyActive }));
+  const rows = await listAssistants(db, { onlyActive });
+  if (session.user.role !== "admin") {
+    // Membros não podem ver o systemPrompt dos assistentes (só admins editam/usam a página admin).
+    return Response.json(
+      rows.map(({ id, name, description, model, active, createdAt }) => ({ id, name, description, model, active, createdAt }))
+    );
+  }
+  return Response.json(rows);
 });
 
 export const POST = apiHandler(async (req) => {

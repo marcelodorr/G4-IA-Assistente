@@ -110,6 +110,8 @@ npx g4-ia-assistente
 
 O instalador detecta que já existe uma instalação vinculada, pergunta se você quer atualizar e, se confirmado, baixa a versão mais recente do código e refaz o deploy — sem recriar o projeto, o banco de dados ou os serviços já existentes. Seus dados, assistentes e usuários são preservados.
 
+Isso só é seguro quando a instalação anterior terminou com sucesso (você chegou a ver o endereço público e a tela `/setup`). Se a primeira instalação falhou no meio do caminho, veja "A instalação falhou antes de terminar" em Problemas comuns abaixo — rodar o comando de novo nesse caso **não** retoma de onde parou, ele tenta atualizar um projeto incompleto.
+
 ## Problemas comuns
 
 - **"Você não está logado na Railway CLI"**: rode `railway login` novamente e execute `npx g4-ia-assistente` de novo.
@@ -122,4 +124,5 @@ O instalador detecta que já existe uma instalação vinculada, pergunta se voc�
 - **"Chave OpenAI inválida"** no wizard de configuração: confira se copiou a chave completa (começa com `sk-`) de [platform.openai.com/api-keys](https://platform.openai.com/api-keys) e se a conta OpenAI tem saldo/cartão configurado. Você pode tentar novamente direto na tela de configuração — nada é perdido.
 - **A aplicação não abre / fica com erro após o deploy**: o Railway verifica automaticamente a saúde do serviço em `/api/health`; se o deploy não ficar saudável, confira `railway logs --service app` para identificar o erro (é comum ser um problema temporário de conexão com o banco — aguarde alguns instantes e recarregue a página).
 - **Esqueci minha senha de administrador**: hoje não existe um fluxo de "esqueci minha senha" no produto; peça a outro administrador para te convidar novamente, ou entre em contato com o suporte do G4.
-- Se nenhuma dessas soluções resolver, rode a CLI novamente (os passos já concluídos no Railway não são refeitos) ou entre em contato com o suporte do G4.
+- **A instalação falhou antes de terminar** (nunca chegou a mostrar o endereço público): o instalador não retoma automaticamente de onde parou — como um projeto já foi vinculado no seu computador, rodar `npx g4-ia-assistente` de novo tentaria apenas *atualizar* esse projeto incompleto, o que não corrige as partes que faltaram (banco, volumes, etc.). O caminho seguro é: apague o projeto incompleto no [painel do Railway](https://railway.app/dashboard) e rode `npx g4-ia-assistente` novamente do zero.
+- Se nenhuma dessas soluções resolver, entre em contato com o suporte do G4.
