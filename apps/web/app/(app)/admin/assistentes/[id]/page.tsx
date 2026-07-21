@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getAssistant } from "@/lib/services/assistants";
 import { AssistantForm } from "@/components/admin/assistant-form";
+import { AssistantFiles } from "@/components/admin/assistant-files";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminAssistentePage({ params }: { params: Promise<
       <AssistantForm assistant={assistente} />
       <section className="space-y-3 border-t pt-6">
         <h2 className="font-heading text-base font-medium">Base de conhecimento</h2>
-        <p>Base de conhecimento disponível em breve.</p>
+        <AssistantFiles assistantId={assistente.id} />
       </section>
     </main>
   );
