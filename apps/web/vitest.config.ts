@@ -9,7 +9,9 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "test/**/*.test.ts"],
+    // "app/**" cobre app/api/chat/chat-route.integration.test.ts (task 21):
+    // teste de integração da rota que precisa ficar ao lado da rota testada
+    include: ["lib/**/*.test.ts", "test/**/*.test.ts", "app/**/*.test.ts"],
     // banco remoto (Railway) tem latência maior (~100-200ms/query); a primeira
     // execução também cria o banco g4_test e roda as migrations
     hookTimeout: 30000,
