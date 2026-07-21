@@ -14,6 +14,11 @@ export default defineConfig({
     // execução também cria o banco g4_test e roda as migrations
     hookTimeout: 30000,
     testTimeout: 30000,
+    // os testes de serviço compartilham um único banco remoto (linha id=1 de
+    // `settings`) e mutam `process.env.ENCRYPTION_KEY` global — arquivos de
+    // teste rodando em paralelo colidem entre si (ver setup.test.ts x
+    // settings.test.ts). Roda um arquivo por vez para evitar a corrida.
+    fileParallelism: false,
   },
   resolve: { alias: { "@": path.resolve(__dirname) } },
 });
