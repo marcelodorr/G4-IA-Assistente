@@ -41,6 +41,7 @@ export function MessageInput({
   }
 
   function submit() {
+    if (disabled) return;
     if (!text.trim() && files.length === 0) return;
     onSend(text.trim(), files);
     setText("");
