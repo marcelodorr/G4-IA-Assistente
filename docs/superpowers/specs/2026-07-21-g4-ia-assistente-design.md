@@ -109,8 +109,8 @@ Fluxo (prompts e mensagens em português, cores da marca):
 1. **Verificação** — `railway --version` e `railway whoami`; se falhar, instrução exata de instalação/login e encerra.
 2. **Código** — baixa tarball da última versão do repo no GitHub (sem exigir git) para pasta local.
 3. **Projeto** — `railway init` com nome escolhido pelo aluno.
-4. **Banco** — provisiona Postgres com pgvector (template Railway de Postgres; verificar na implementação se a imagem padrão inclui pgvector — senão usar imagem `pgvector/pgvector`).
-5. **Secrets** — gera `AUTH_SECRET` e `ENCRYPTION_KEY` com crypto seguro; configura variáveis com `DATABASE_URL` por referência.
+4. **Banco** — provisiona Postgres com a imagem `pgvector/pgvector:pg17` (o template padrão do Railway não inclui pgvector) com volume e senha gerada pela CLI.
+5. **Secrets** — gera `AUTH_SECRET`, `ENCRYPTION_KEY` e a senha do banco com crypto seguro; compõe a `DATABASE_URL` da rede privada (`db.railway.internal`).
 6. **Volume** — anexa volume em `/data`.
 7. **Deploy** — `railway up`, acompanhando o build.
 8. **Domínio** — `railway domain`, imprime URL e abre o navegador em `/setup`.
@@ -126,7 +126,7 @@ Fluxo (prompts e mensagens em português, cores da marca):
 
 ## 10. Riscos e pontos de verificação na implementação
 
-- Confirmar se a imagem padrão de Postgres do Railway inclui pgvector; caso contrário, usar `pgvector/pgvector` no passo de provisionamento da CLI.
+- **Resolvido (2026-07-21):** o Postgres padrão do Railway (PG18) NÃO inclui pgvector (verificado em projeto real). A CLI provisiona o banco com a imagem `pgvector/pgvector:pg17` + volume, e o app conecta via rede privada (`db.railway.internal:5432`) com senha gerada pela própria CLI.
 - Build nativo do argon2 no container do Railway; fallback bcryptjs.
 - `railway up` a partir de tarball baixado no Windows (caminhos, exclusões) — testar cedo.
 - Tamanho de contexto ao injetar PDFs anexados no chat — truncar com aviso ao usuário.

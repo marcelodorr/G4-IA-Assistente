@@ -16,7 +16,8 @@
 - CLI: **sem** dependência de git ou shell scripts; apenas Node + Railway CLI do aluno. Toda saída em pt-BR.
 - Repo GitHub do app: `GuilhermeMReis/G4-IA-Assistente` (tarball `https://codeload.github.com/GuilhermeMReis/G4-IA-Assistente/tar.gz/refs/heads/main`).
 - Nome do pacote npm da CLI: `g4-ia-assistente`, bin `g4-ia-assistente`.
-- Flags da Railway CLI usadas: `init --name`, `add --database postgres`, `add --service app --variables`, `volume add`, `up --service app --detach`, `domain --service app`, `whoami`, `status`. **Verificar com `railway <cmd> --help` na primeira execução real** — se alguma flag tiver mudado, ajustar em `steps.ts` (única fonte).
+- Flags da Railway CLI (verificadas contra a CLI **5.27.2** em 2026-07-21): `init --name`, `add --image pgvector/pgvector:pg17 --service db --variables`, `add --service app --variables`, `service <nome>` (linka o serviço no diretório — **necessário antes de `volume add`**, que só aceita `-m/--mount-path`), `volume add -m`, `up --service app --detach`, `domain --service app`, `whoami`, `status`, `service delete --service <nome> --yes`.
+- **Postgres padrão do Railway (PG18) NÃO tem pgvector** (verificado em projeto real em 2026-07-21). O banco DEVE ser criado com a imagem `pgvector/pgvector:pg17`, volume em `/var/lib/postgresql/data`, variáveis `POSTGRES_PASSWORD/POSTGRES_USER=postgres/POSTGRES_DB=railway/PGDATA=/var/lib/postgresql/data/pgdata`; o app conecta via rede privada `postgresql://postgres:<senha>@db.railway.internal:5432/railway` com senha gerada pela CLI.
 
 ---
 
@@ -163,8 +164,8 @@ Sem Docker local, a validação definitiva acontece no primeiro deploy real via 
 - Produces (todas em `steps.ts`, recebendo `Runner` injetado — testáveis sem Railway):
   - `type Runner = (cmd: string, args: string[], opts?: { cwd?: string }) => Promise<{ code: number; stdout: string; stderr: string }>`
   - `checkRailway(run): Promise<{ ok: true } | { ok: false; motivo: "nao-instalada" | "nao-logada" }>`
-  - `generateSecrets(rand?): { AUTH_SECRET: string; ENCRYPTION_KEY: string }` — base64url 32 bytes / hex 64 chars
-  - `createProject(run, cwd, nome)`, `addDatabase(run, cwd)`, `addAppService(run, cwd, secrets)`, `addVolume(run, cwd)`, `deploy(run, cwd)` — lançam `Error` com stderr quando `code !== 0`
+  - `generateSecrets(rand?): { AUTH_SECRET: string; ENCRYPTION_KEY: string; DB_PASSWORD: string }` — base64url 32 bytes / hex 64 chars / hex 32 chars
+  - `createProject(run, cwd, nome)`, `addDatabase(run, cwd, dbPassword)` (imagem pgvector), `linkService(run, cwd, nome)`, `addVolume(run, cwd, mountPath)` (requer `linkService` antes), `addAppService(run, cwd, secrets)`, `deploy(run, cwd)` — lançam `Error` com stderr quando `code !== 0`
   - `getDomain(run, cwd): Promise<string>` — extrai primeira URL `https://...` do stdout
   - `isLinkedProject(run, cwd): Promise<boolean>` — `railway status` code 0
   - `downloadCode(destDir, opts?: { tarballUrl?, fetchImpl? }): Promise<void>` (em `download.ts`)
@@ -223,7 +224,7 @@ Rodar `npm install` na raiz para linkar o workspace.
 `packages/cli/src/steps.test.ts`:
 ```ts
 import { describe, it, expect } from "vitest";
-import { checkRailway, generateSecrets, createProject, addAppService, getDomain, isLinkedProject } from "./steps";
+import { checkRailway, generateSecrets, createProject, addDatabase, addAppService, getDomain, isLinkedProject } from "./steps";
 
 type Call = { cmd: string; args: string[] };
 
@@ -254,11 +255,23 @@ describe("checkRailway", () => {
 });
 
 describe("generateSecrets", () => {
-  it("gera ENCRYPTION_KEY hex de 64 chars e AUTH_SECRET não-vazio", () => {
+  it("gera ENCRYPTION_KEY hex 64, DB_PASSWORD hex 32 e AUTH_SECRET não-vazio", () => {
     const s = generateSecrets();
     expect(s.ENCRYPTION_KEY).toMatch(/^[0-9a-f]{64}$/);
+    expect(s.DB_PASSWORD).toMatch(/^[0-9a-f]{32}$/);
     expect(s.AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
     expect(generateSecrets().ENCRYPTION_KEY).not.toBe(s.ENCRYPTION_KEY);
+  });
+});
+
+describe("addDatabase", () => {
+  it("cria o serviço db com a imagem pgvector e a senha", async () => {
+    const { run, calls } = fakeRunner({});
+    await addDatabase(run, "/tmp/app", "abc123");
+    const args = calls[0].args.join(" ");
+    expect(args).toContain("add --image pgvector/pgvector:pg17 --service db");
+    expect(args).toContain("POSTGRES_PASSWORD=abc123");
+    expect(args).toContain("PGDATA=/var/lib/postgresql/data/pgdata");
   });
 });
 
@@ -277,12 +290,12 @@ describe("createProject", () => {
 describe("addAppService", () => {
   it("passa todas as variáveis", async () => {
     const { run, calls } = fakeRunner({});
-    await addAppService(run, "/tmp/app", { AUTH_SECRET: "s3", ENCRYPTION_KEY: "e".repeat(64) });
+    await addAppService(run, "/tmp/app", { AUTH_SECRET: "s3", ENCRYPTION_KEY: "e".repeat(64), DB_PASSWORD: "abc123" });
     const args = calls[0].args.join(" ");
     expect(args).toContain("add --service app");
     expect(args).toContain("AUTH_SECRET=s3");
     expect(args).toContain(`ENCRYPTION_KEY=${"e".repeat(64)}`);
-    expect(args).toContain("DATABASE_URL=${{Postgres.DATABASE_URL}}");
+    expect(args).toContain("DATABASE_URL=postgresql://postgres:abc123@db.railway.internal:5432/railway");
     expect(args).toContain("DATA_DIR=/data");
     expect(args).toContain("AUTH_TRUST_HOST=true");
   });
@@ -353,27 +366,39 @@ export function generateSecrets(rand: (n: number) => Buffer = randomBytes) {
   return {
     AUTH_SECRET: rand(32).toString("base64url"),
     ENCRYPTION_KEY: rand(32).toString("hex"),
+    DB_PASSWORD: rand(16).toString("hex"),
   };
 }
 
 export const createProject = (run: Runner, cwd: string, nome: string) =>
   exec(run, cwd, ["init", "--name", nome], "criar o projeto no Railway");
 
-export const addDatabase = (run: Runner, cwd: string) =>
-  exec(run, cwd, ["add", "--database", "postgres"], "provisionar o Postgres");
+// o template padrão de Postgres do Railway (PG18) não inclui pgvector — usamos a imagem oficial pgvector
+export const addDatabase = (run: Runner, cwd: string, dbPassword: string) =>
+  exec(run, cwd, [
+    "add", "--image", "pgvector/pgvector:pg17", "--service", "db",
+    "--variables", `POSTGRES_PASSWORD=${dbPassword}`,
+    "--variables", "POSTGRES_USER=postgres",
+    "--variables", "POSTGRES_DB=railway",
+    "--variables", "PGDATA=/var/lib/postgresql/data/pgdata",
+  ], "provisionar o Postgres (pgvector)");
 
-export const addAppService = (run: Runner, cwd: string, secrets: { AUTH_SECRET: string; ENCRYPTION_KEY: string }) =>
+export const linkService = (run: Runner, cwd: string, nome: string) =>
+  exec(run, cwd, ["service", nome], `selecionar o serviço ${nome}`);
+
+export const addAppService = (run: Runner, cwd: string, secrets: { AUTH_SECRET: string; ENCRYPTION_KEY: string; DB_PASSWORD: string }) =>
   exec(run, cwd, [
     "add", "--service", "app",
     "--variables", `AUTH_SECRET=${secrets.AUTH_SECRET}`,
     "--variables", `ENCRYPTION_KEY=${secrets.ENCRYPTION_KEY}`,
-    "--variables", "DATABASE_URL=${{Postgres.DATABASE_URL}}",
+    "--variables", `DATABASE_URL=postgresql://postgres:${secrets.DB_PASSWORD}@db.railway.internal:5432/railway`,
     "--variables", "DATA_DIR=/data",
     "--variables", "AUTH_TRUST_HOST=true",
   ], "criar o serviço do app");
 
-export const addVolume = (run: Runner, cwd: string) =>
-  exec(run, cwd, ["volume", "add", "--mount-path", "/data", "--service", "app"], "anexar o volume de dados");
+// pré-requisito: linkService() para o serviço dono do volume — `volume add` não tem flag --service na CLI 5.27
+export const addVolume = (run: Runner, cwd: string, mountPath: string) =>
+  exec(run, cwd, ["volume", "add", "-m", mountPath], `anexar o volume em ${mountPath}`);
 
 export const deploy = (run: Runner, cwd: string) =>
   exec(run, cwd, ["up", "--service", "app", "--detach"], "fazer o deploy");
@@ -462,7 +487,7 @@ import path from "path";
 import os from "os";
 import open from "open";
 import { run } from "./runner.js";
-import { checkRailway, generateSecrets, createProject, addDatabase, addAppService, addVolume, deploy, getDomain, isLinkedProject } from "./steps.js";
+import { checkRailway, generateSecrets, createProject, addDatabase, linkService, addAppService, addVolume, deploy, getDomain, isLinkedProject } from "./steps.js";
 import { downloadCode } from "./download.js";
 
 const dourado = (s: string) => pc.bold(pc.yellow(s));
@@ -514,16 +539,21 @@ async function main() {
   await createProject(run, appDir, nome);
   s.stop("Projeto criado");
 
-  s.start("Provisionando o banco Postgres");
-  await addDatabase(run, appDir);
+  const secrets = generateSecrets();
+
+  s.start("Provisionando o banco Postgres (pgvector)");
+  await addDatabase(run, appDir, secrets.DB_PASSWORD);
+  await linkService(run, appDir, "db");
+  await addVolume(run, appDir, "/var/lib/postgresql/data");
   s.stop("Postgres provisionado");
 
   s.start("Gerando chaves de segurança e configurando o serviço");
-  await addAppService(run, appDir, generateSecrets());
+  await addAppService(run, appDir, secrets);
   s.stop("Serviço configurado");
 
   s.start("Anexando volume de arquivos");
-  await addVolume(run, appDir);
+  await linkService(run, appDir, "app");
+  await addVolume(run, appDir, "/data");
   s.stop("Volume anexado");
 
   s.start("Fazendo o deploy (isso pode levar alguns minutos)");
