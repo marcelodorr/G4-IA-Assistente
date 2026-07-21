@@ -591,160 +591,27 @@ Teste real completo (opcional, requer conta Railway): `railway login` e rodar `n
 
 - [ ] **Step 10: Commit** — `git add -A && git commit -m "feat: CLI g4-ia-assistente para deploy no Railway do aluno"`
 
-### Task 21: Smoke e2e (Playwright + OpenAI mockada)
+### Task 21: Teste de integração da rota de chat com OpenAI mockada (vitest, sem navegador)
+
+> Decisão do usuário (2026-07-21): priorizar testes unitários/integração em vez de E2E — o smoke Playwright original foi descartado. Este task cobre o caminho crítico (chat streaming + persistência + título) na camada da API, em vitest.
 
 **Files:**
-- Create: `apps/web/playwright.config.ts`, `apps/web/e2e/smoke.spec.ts`, `apps/web/test/mocks/openai-server.mjs`, `apps/web/e2e/global-setup.ts`
-- Verify: o `/api/chat` usa `openai.chat(modelId)` (API de chat completions, já definido na Parte 1, Task 11) — obrigatório para o mock desta task funcionar.
+- Create: `apps/web/test/mocks/openai-server.mjs` (mock HTTP da OpenAI: /v1/models, /v1/embeddings, /v1/chat/completions com SSE — código do plano original), `apps/web/app/api/chat/chat-route.integration.test.ts`
 
 **Interfaces:**
-- Produces: `npm run e2e -w apps/web` — sobe mock OpenAI (porta 8788) + next dev (porta 3100, banco `g4_e2e` migrado) e roda o fluxo setup → chat.
+- Consumes: handler `POST` de `@/app/api/chat/route`, serviços de settings/conversations, helper `getTestDb`.
+- Produces: teste gated por `TEST_DATABASE_URL` que sobe o mock numa porta efêmera e valida o fluxo completo.
 
-- [ ] **Step 1: Instalar** — `cd apps/web && npm i -D @playwright/test && npx playwright install chromium`
-
-- [ ] **Step 2: Mock da OpenAI**
-
-`apps/web/test/mocks/openai-server.mjs`:
-```js
-import http from "http";
-
-const PORT = Number(process.env.MOCK_PORT ?? 8788);
-const RESPOSTA = "Olá! Como posso ajudar o seu negócio hoje?";
-
-function sse(res, chunks) {
-  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
-  for (const c of chunks) res.write(`data: ${JSON.stringify(c)}\n\n`);
-  res.write("data: [DONE]\n\n");
-  res.end();
-}
-
-http.createServer((req, res) => {
-  let body = "";
-  req.on("data", (d) => (body += d));
-  req.on("end", () => {
-    if (req.url?.endsWith("/models")) {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ object: "list", data: [{ id: "gpt-5-mini", object: "model" }] }));
-    }
-    if (req.url?.endsWith("/embeddings")) {
-      const inputs = [].concat(JSON.parse(body).input);
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({
-        object: "list", model: "text-embedding-3-small",
-        data: inputs.map((_, index) => ({ object: "embedding", index, embedding: Array(1536).fill(0.001) })),
-        usage: { prompt_tokens: 1, total_tokens: 1 },
-      }));
-    }
-    if (req.url?.endsWith("/chat/completions")) {
-      const base = { id: "chatcmpl-1", object: "chat.completion.chunk", created: 0, model: "gpt-5-mini" };
-      return sse(res, [
-        { ...base, choices: [{ index: 0, delta: { role: "assistant", content: RESPOSTA }, finish_reason: null }] },
-        { ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
-      ]);
-    }
-    res.writeHead(404); res.end();
-  });
-}).listen(PORT, () => console.log(`mock openai na porta ${PORT}`));
-```
-
-- [ ] **Step 3: Config e global setup**
-
-`apps/web/e2e/global-setup.ts` — cria/reseta o banco `g4_e2e` (no Postgres de dev do Railway) e roda migrations. `E2E_DATABASE_URL` deve apontar para o banco `g4_e2e` no mesmo servidor do `.env`:
-```ts
-import { execSync } from "child_process";
-import postgres from "postgres";
-
-export default async function globalSetup() {
-  const url = process.env.E2E_DATABASE_URL!;
-  const admin = postgres(url.replace(/\/[^/]+$/, "/postgres"));
-  await admin.unsafe(`DROP DATABASE IF EXISTS g4_e2e WITH (FORCE)`);
-  await admin.unsafe(`CREATE DATABASE g4_e2e`);
-  await admin.end();
-  execSync("npx drizzle-kit migrate", {
-    cwd: __dirname + "/..",
-    env: { ...process.env, DATABASE_URL: url },
-    stdio: "inherit",
-  });
-}
-```
-
-`apps/web/playwright.config.ts` (carrega o `.env` como o vitest.config, via `process.loadEnvFile`, e define `E2E_DATABASE_URL` derivada da `TEST_DATABASE_URL` trocando o nome do banco por `g4_e2e` se a env não vier definida):
-```ts
-import { defineConfig } from "@playwright/test";
-import { existsSync } from "fs";
-import path from "path";
-
-const envFile = path.resolve(__dirname, ".env");
-if (existsSync(envFile)) process.loadEnvFile(envFile);
-const E2E_DB = process.env.E2E_DATABASE_URL
-  ?? process.env.TEST_DATABASE_URL!.replace(/\/[^/]+$/, "/g4_e2e");
-process.env.E2E_DATABASE_URL = E2E_DB;
-
-export default defineConfig({
-  testDir: "./e2e",
-  globalSetup: "./e2e/global-setup.ts",
-  timeout: 60_000,
-  use: { baseURL: "http://localhost:3100" },
-  webServer: [
-    {
-      command: "node test/mocks/openai-server.mjs",
-      port: 8788,
-      reuseExistingServer: false,
-    },
-    {
-      command: "npx next dev -p 3100",
-      port: 3100,
-      reuseExistingServer: false,
-      env: {
-        DATABASE_URL: E2E_DB,
-        AUTH_SECRET: "e2e-secret",
-        ENCRYPTION_KEY: "f".repeat(64),
-        DATA_DIR: "./.e2e-data",
-        AUTH_TRUST_HOST: "true",
-        OPENAI_BASE_URL: "http://localhost:8788/v1",
-      },
-    },
-  ],
-});
-```
-Adicionar script em `apps/web/package.json`: `"e2e": "playwright test"`.
-
-- [ ] **Step 4: Spec do fluxo completo**
-
-`apps/web/e2e/smoke.spec.ts`:
-```ts
-import { test, expect } from "@playwright/test";
-
-test("setup → chat com streaming", async ({ page }) => {
-  // Wizard de setup
-  await page.goto("/setup");
-  await page.getByLabel("Seu nome").fill("Admin E2E");
-  await page.getByLabel("E-mail").fill("admin@e2e.com");
-  await page.getByLabel(/Senha/).fill("senha-e2e-123");
-  await page.getByRole("button", { name: "Continuar" }).click();
-
-  await page.getByLabel("Chave da OpenAI").fill("sk-e2e-fake");
-  await page.getByRole("button", { name: "Continuar" }).click();
-
-  await page.getByRole("button", { name: "Concluir" }).click();
-
-  // Logado e no chat
-  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
-
-  // Envia mensagem e recebe resposta mockada com streaming
-  await page.getByPlaceholder("Envie uma mensagem...").fill("Olá, G4!");
-  await page.keyboard.press("Enter");
-  await expect(page.getByText("Olá! Como posso ajudar o seu negócio hoje?")).toBeVisible({ timeout: 20_000 });
-
-  // Conversa aparece na sidebar após refresh
-  await page.reload();
-  await expect(page.getByText("Olá! Como posso ajudar o seu negócio hoje?")).toBeVisible();
-});
-```
-
-- [ ] **Step 5: Rodar** — `npm run e2e -w apps/web` (usa o Postgres de dev do Railway via `.env`) → esperado: 1 passed. Ajustar seletores conforme a UI real se algum falhar (rodar com `--ui` para depurar).
-
-- [ ] **Step 6: Commit** — `git add -A && git commit -m "test: smoke e2e do fluxo setup → chat com OpenAI mockada"`
+- [ ] **Step 1: Mock server** — implementar `openai-server.mjs` exportando `startMockOpenAI(port?) => Promise<{ url, close }>` (server http nativo; SSE com resposta fixa "Olá! Como posso ajudar o seu negócio hoje?"; embeddings 1536 dims; /v1/models 200).
+- [ ] **Step 2: Teste de integração (RED primeiro)** — `chat-route.integration.test.ts`:
+  - `vi.mock("@/lib/auth")` para `auth()` retornar sessão de um usuário seedado;
+  - seed no g4_test: user, settings com chave criptografada (ENCRYPTION_KEY de teste) e defaultModel, conversation do user;
+  - `process.env.OPENAI_BASE_URL = url + "/v1"` do mock;
+  - chamar `POST(new Request("http://test/api/chat", { method: "POST", body: JSON.stringify({ messages: [msg de texto UIMessage], conversationId }) }))`;
+  - ler o stream da Response até o fim e afirmar que o texto mockado aparece;
+  - afirmar persistência: 2 mensagens na conversa; título definido (≠ null).
+- [ ] **Step 3: GREEN** — rodar `npx vitest run app/api/chat` até passar; ajustar apenas o teste (a rota já está pronta; se a rota tiver bug real, reportar como finding em vez de contornar).
+- [ ] **Step 4: Commit** — `git add -A && git commit -m "test: integração da rota de chat com OpenAI mockada"`
 
 ### Task 22: Documentação final
 
