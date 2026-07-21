@@ -1,11 +1,12 @@
 import { stepCountIs, streamText } from "ai";
 import { db } from "@/lib/db";
 import { apiHandler, requireSession } from "@/lib/services/guards";
-import { getConversation, replaceMessages } from "@/lib/services/conversations";
+import { getConversation, replaceMessages, setConversationTitle } from "@/lib/services/conversations";
 import { getSettings } from "@/lib/services/settings";
 import { getProvider } from "@/lib/ai/provider";
 import { prepareModelMessages } from "@/lib/ai/prepare-messages";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
+import { generateConversationTitle } from "@/lib/ai/title";
 import { assistants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -40,6 +41,11 @@ export const POST = apiHandler(async (req) => {
         .filter((m: any) => m.role === "user" || m.role === "assistant")
         .map((m: any) => ({ role: m.role, parts: m.parts }));
       await replaceMessages(db, conversationId, persistable);
+      if (!got.conversation.title) {
+        const firstText = (uiMessages[0]?.parts ?? []).find((p: any) => p.type === "text")?.text ?? "Nova conversa";
+        const title = await generateConversationTitle(openai.chat(settings.defaultModel), firstText).catch(() => null);
+        if (title) await setConversationTitle(db, conversationId, title);
+      }
     },
   });
 });
