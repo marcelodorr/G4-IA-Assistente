@@ -19,6 +19,7 @@ type AssistantFileRow = {
   status: "pending" | "processing" | "ready" | "error";
   error: string | null;
   createdAt: string;
+  stale: boolean;
 };
 
 function formatSize(bytes: number) {
@@ -27,8 +28,15 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function isStale(file: AssistantFileRow) {
+  return file.stale;
+}
+
 function StatusBadge({ status, error }: { status: AssistantFileRow["status"]; error: string | null }) {
-  if (status === "pending" || status === "processing") {
+  if (status === "pending") {
+    return <Badge variant="outline">Aguardando processamento</Badge>;
+  }
+  if (status === "processing") {
     return (
       <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
         <Loader2Icon className="size-3 animate-spin" />
@@ -79,7 +87,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
   }, [carregar]);
 
   useEffect(() => {
-    const pendente = files.some((f) => f.status === "pending" || f.status === "processing");
+    const pendente = files.some((f) => (f.status === "pending" || f.status === "processing") && !isStale(f));
     if (!pendente) return;
     const intervalo = setInterval(carregar, 3000);
     return () => clearInterval(intervalo);
@@ -113,6 +121,15 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
       toast.error("Erro ao remover arquivo");
       return;
     }
+    await carregar();
+  }
+
+  async function tentarNovamente(file: AssistantFileRow) {
+    setRemovendoId(file.id);
+    const res = await fetch(`/api/assistants/${assistantId}/files/${file.id}`, { method: "POST" });
+    setRemovendoId(null);
+    if (!res.ok) return toast.error((await res.json()).error ?? "Erro ao reprocessar documento");
+    toast.success("Documento enviado novamente para processamento");
     await carregar();
   }
 
@@ -155,9 +172,11 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
               <TableCell className="font-medium">{file.filename}</TableCell>
               <TableCell className="text-muted-foreground">{formatSize(file.size)}</TableCell>
               <TableCell>
-                <StatusBadge status={file.status} error={file.error} />
+                {isStale(file) ? <Badge variant="destructive">Processamento travado</Badge> : <StatusBadge status={file.status} error={file.error} />}
               </TableCell>
               <TableCell className="text-right">
+                <div className="flex justify-end gap-1">
+                {(file.status === "error" || isStale(file)) && <Button type="button" variant="outline" size="sm" disabled={removendoId === file.id} onClick={() => tentarNovamente(file)}>Tentar novamente</Button>}
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -167,6 +186,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
                 >
                   <XIcon />
                 </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}

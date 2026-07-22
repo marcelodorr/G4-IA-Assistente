@@ -5,13 +5,13 @@ import { hashPassword } from "./password";
 describe("verifyCredentials", () => {
   const makeUser = async (over = {}) => ({
     id: "u1", name: "Ana", email: "ana@sequor.com.br", role: "member" as const,
-    active: true, passwordHash: await hashPassword("senha123"), createdAt: new Date(), ...over,
+    active: true, passwordHash: await hashPassword("senha123"), sessionVersion: 1, createdAt: new Date(), ...over,
   });
 
   it("retorna usuário com credenciais corretas (email normalizado)", async () => {
     const user = await makeUser();
     const result = await verifyCredentials("  ANA@sequor.com.br ", "senha123", async () => user);
-    expect(result).toEqual({ id: "u1", name: "Ana", email: "ana@sequor.com.br", role: "member" });
+    expect(result).toEqual({ id: "u1", name: "Ana", email: "ana@sequor.com.br", role: "member", sessionVersion: 1 });
   });
 
   it("null para senha errada", async () => {

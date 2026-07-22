@@ -53,7 +53,7 @@ export function NewChat({
         <p className="text-lg text-muted-foreground">Transformando dados em experiências que realmente importam.</p>
       </div>
       <div className="w-full max-w-xl space-y-3">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <AssistantPicker assistants={assistants} value={assistantId} onChange={setAssistantId} />
           <ModelPicker value={model} onChange={setModel} models={models} />
         </div>

@@ -10,10 +10,12 @@ import { MessageInput, type Attachment } from "./message-input";
 export function Chat({
   conversationId,
   initialMessages,
+  interruptedMessageIds,
   assistantName,
 }: {
   conversationId: string;
   initialMessages: UIMessage[];
+  interruptedMessageIds: string[];
   assistantName?: string | null;
 }) {
   const router = useRouter();
@@ -66,7 +68,7 @@ export function Chat({
           Assistente: <span className="text-primary">{assistantName}</span>
         </div>
       )}
-      <MessageList messages={messages} streaming={status === "streaming"} />
+      <MessageList messages={messages} streaming={status === "streaming"} interruptedMessageIds={interruptedMessageIds} />
       <MessageInput onSend={onSend} disabled={status !== "ready" && status !== "error"} />
     </div>
   );

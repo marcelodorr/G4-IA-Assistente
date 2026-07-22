@@ -768,6 +768,8 @@ Documentar:
 
 **Objetivo:** deixar o sistema mais fácil de operar por pessoas não técnicas.
 
+**Status:** ✅ implementada em 22/07/2026. Consulte `docs/melhorias-de-produto.md` para operação e validação.
+
 ### 8.1 Melhorar estados e mensagens da interface
 
 Exibir estados claros para:

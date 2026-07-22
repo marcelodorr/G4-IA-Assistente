@@ -59,9 +59,12 @@ Abra a aba **Environment** do serviço Compose e informe:
 DATABASE_URL=postgresql://USUARIO:SENHA@HOST_INTERNO:5432/BANCO
 AUTH_SECRET=<valor-gerado>
 ENCRYPTION_KEY=<64-caracteres-hexadecimais>
+APP_VERSION=0.1.0
 ```
 
 Use como `DATABASE_URL` a **Internal Connection URL** copiada do banco. Não inclua aspas nem espaços ao redor do `=`.
+
+`APP_VERSION` é opcional e aparece no painel de saúde para comparação com a release mais recente publicada no GitHub.
 
 O arquivo `dokploy.env.example` mostra apenas o formato. Nunca grave a conexão real no repositório.
 

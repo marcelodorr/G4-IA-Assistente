@@ -2,14 +2,16 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { getPublicError } from "@/lib/errors/public-error";
 
 export async function requireSession() {
   const session = await auth();
   if (!session?.user) throw Response.json({ error: "Não autenticado" }, { status: 401 });
   // A sessão JWT continua válida mesmo após o usuário ser desativado; checa o
   // estado atual no banco a cada request de API para revogar o acesso na hora.
-  const [user] = await db.select({ active: users.active }).from(users).where(eq(users.id, session.user.id));
+  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active) throw Response.json({ error: "Conta desativada" }, { status: 403 });
+  if (user.sessionVersion !== session.user.sessionVersion) throw Response.json({ error: "Sessão encerrada. Entre novamente." }, { status: 401 });
   return session;
 }
 
@@ -26,13 +28,18 @@ export function apiHandler(fn: (req: Request, ctx: RouteContext) => Promise<Resp
     try { return await fn(req, ctx); }
     catch (e) {
       if (e instanceof Response) return e;
+      const safe = getPublicError(e);
+      if (safe.code !== "INTERNAL_ERROR") {
+        console.error(e);
+        return Response.json({ error: safe.message, code: safe.code }, { status: safe.status });
+      }
       // Só expõe a mensagem para erros de domínio lançados por nós (`new Error(...)` puro).
       // Erros de bibliotecas (ex.: PostgresError) não devem vazar detalhes internos.
       if (e instanceof Error && e.constructor === Error) {
         return Response.json({ error: e.message }, { status: 400 });
       }
       console.error(e);
-      return Response.json({ error: "Erro interno" }, { status: 500 });
+      return Response.json({ error: safe.message, code: safe.code }, { status: safe.status });
     }
   };
 }

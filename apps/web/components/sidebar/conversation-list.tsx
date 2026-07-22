@@ -44,6 +44,7 @@ export function ConversationList({
       <div className="px-3 pb-2">
         <Input
           value={busca}
+          aria-label="Buscar conversas"
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar conversas..."
         />
@@ -70,7 +71,7 @@ export function ConversationList({
                 onClick={() => excluir(conv.id)}
                 disabled={excluindoId === conv.id}
                 aria-label="Excluir conversa"
-                className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-destructive group-hover/conversation:block"
+                className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-destructive focus:block group-hover/conversation:block group-focus-within/conversation:block"
               >
                 <Trash2 className="size-3.5" />
               </button>

@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   active: boolean("active").notNull().default(true),
   dailyTokenLimit: integer("daily_token_limit"),
   monthlyTokenLimit: integer("monthly_token_limit"),
+  sessionVersion: integer("session_version").notNull().default(1),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -19,6 +21,8 @@ export const invites = pgTable("invites", {
   role: text("role", { enum: ["admin", "member"] }).notNull().default("member"),
   expiresAt: timestamp("expires_at").notNull(),
   usedAt: timestamp("used_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

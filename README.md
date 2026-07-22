@@ -27,6 +27,8 @@ O repositório inclui um `docker-compose.yml` de produção para conectar a apli
 
 O controle de histórico, streaming, cotas, custos e modelos da IA está documentado em **[docs/controle-de-uso-ia.md](docs/controle-de-uso-ia.md)**.
 
+O painel de saúde, a gestão completa de contas e as melhorias de acessibilidade estão documentados em **[docs/melhorias-de-produto.md](docs/melhorias-de-produto.md)**.
+
 ## Licença
 
 MIT.

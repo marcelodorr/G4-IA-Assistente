@@ -10,5 +10,6 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("schema", () => {
     const [u] = await db.insert(users).values({ name: "Teste", email: "t@sequor.com.br", passwordHash: "x" }).returning();
     expect(u.role).toBe("member");
     expect(u.active).toBe(true);
+    expect(u.sessionVersion).toBe(1);
   });
 });

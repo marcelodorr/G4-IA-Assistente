@@ -46,9 +46,10 @@ function UserBubble({ message }: { message: UIMessage }) {
 function ToolChip({ part }: { part: MessagePart }) {
   const state = "state" in part ? part.state : undefined;
   const done = state === "output-available" || state === "output-error" || state === "output-denied";
+  const failed = state === "output-error" || state === "output-denied";
   return (
     <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-secondary/60 px-3 py-1 text-xs text-muted-foreground">
-      {done ? "✓ Base consultada" : "🔎 Consultando base de conhecimento…"}
+      {failed ? "Não foi possível consultar a base" : done ? "✓ Base consultada" : "🔎 Consultando base de conhecimento…"}
     </div>
   );
 }
@@ -98,7 +99,7 @@ function hasVisibleText(message: UIMessage | undefined) {
   );
 }
 
-export function MessageList({ messages, streaming }: { messages: UIMessage[]; streaming: boolean }) {
+export function MessageList({ messages, streaming, interruptedMessageIds = [] }: { messages: UIMessage[]; streaming: boolean; interruptedMessageIds?: string[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -107,15 +108,17 @@ export function MessageList({ messages, streaming }: { messages: UIMessage[]; st
 
   const lastMessage = messages[messages.length - 1];
   const showTyping = streaming && !hasVisibleText(lastMessage);
+  const interrupted = new Set(interruptedMessageIds);
 
   return (
-    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+    <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-4" aria-live="polite" aria-busy={streaming}>
       {messages.map((message) =>
         message.role === "user" ? (
           <UserBubble key={message.id} message={message} />
         ) : (
           <div key={message.id} className="w-full">
             <AssistantContent parts={message.parts} />
+            {interrupted.has(message.id) && <div role="alert" className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">A resposta foi interrompida. Envie sua mensagem novamente para tentar de novo.</div>}
           </div>
         )
       )}

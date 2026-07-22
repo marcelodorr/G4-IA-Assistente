@@ -20,6 +20,7 @@ import { generateConversationTitle } from "@/lib/ai/title";
 import { makeKnowledgeTool } from "@/lib/ai/knowledge-tool";
 import { assistants, chatUploads } from "@/lib/db/schema";
 import { hasReadyFiles } from "@/lib/rag/search";
+import { getPublicError } from "@/lib/errors/public-error";
 
 export const maxDuration = 150;
 
@@ -131,7 +132,7 @@ export const POST = apiHandler(async (req) => {
       stopWhen: stepCountIs(CHAT_LIMITS.maxToolCalls + 1),
       tools,
       timeout: { totalMs: CHAT_LIMITS.totalTimeoutMs, toolMs: 30_000 },
-      onError: () => markInterrupted("Falha durante a geração da resposta"),
+      onError: ({ error }) => markInterrupted(getPublicError(error).message),
       onAbort: () => markInterrupted("Resposta interrompida"),
     });
 
@@ -170,7 +171,7 @@ export const POST = apiHandler(async (req) => {
           if (title) await setConversationTitle(db, body.conversationId as string, title);
         }
       },
-      onError: () => "Não foi possível concluir a resposta. Tente novamente.",
+      onError: (error) => getPublicError(error).message,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao iniciar resposta";

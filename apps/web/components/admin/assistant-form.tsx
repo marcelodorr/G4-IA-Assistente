@@ -98,7 +98,7 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
           </SelectContent>
         </Select>
       </div>
-      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       <Button
         className="w-full"
         disabled={!name.trim() || !systemPrompt.trim() || enviando}

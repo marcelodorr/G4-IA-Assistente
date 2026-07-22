@@ -15,13 +15,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) redirect("/login");
   // A sessão JWT continua válida após a desativação do usuário; confirma no banco
   // a cada navegação para não deixar um usuário desativado usar o app.
-  const [user] = await db.select({ active: users.active }).from(users).where(eq(users.id, session.user.id));
-  if (!user || !user.active) redirect("/login");
+  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, session.user.id));
+  if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
   const convs = await listConversations(db, session.user.id);
   return (
     <div className="flex h-screen">
       <Sidebar user={session.user} conversations={convs} />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="min-w-0 flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
     </div>
   );
 }

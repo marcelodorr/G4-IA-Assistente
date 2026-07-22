@@ -73,7 +73,7 @@ export function SetupWizard() {
               <SelectContent>{SUPPORTED_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          {erro && <p className="text-sm text-destructive">{erro}</p>}
+          {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setPasso(2)}>Voltar</Button>
             <Button className="flex-1" disabled={enviando} onClick={concluir}>{enviando ? "Configurando..." : "Concluir"}</Button>

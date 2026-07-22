@@ -19,12 +19,17 @@ export const authConfig = {
       return Boolean(auth?.user);
     },
     jwt({ token, user }) {
-      if (user) { token.id = user.id; token.role = user.role; }
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.sessionVersion = (user as { sessionVersion?: number }).sessionVersion ?? 1;
+      }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id as string;
       session.user.role = token.role as "admin" | "member";
+      session.user.sessionVersion = token.sessionVersion as number;
       return session;
     },
   },

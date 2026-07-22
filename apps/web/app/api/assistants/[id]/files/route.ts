@@ -10,7 +10,11 @@ export const GET = apiHandler(async (_req, { params }) => {
   const { id } = await params;
   const rows = await db.select().from(assistantFiles)
     .where(eq(assistantFiles.assistantId, id)).orderBy(desc(assistantFiles.createdAt));
-  return Response.json(rows);
+  return Response.json(rows.map((row) => ({
+    ...row,
+    stale: (row.status === "pending" || row.status === "processing")
+      && Date.now() - row.createdAt.getTime() > 10 * 60_000,
+  })));
 });
 
 export const POST = apiHandler(async (req, { params }) => {

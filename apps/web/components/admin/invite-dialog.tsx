@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function InviteDialog() {
+  const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
@@ -34,6 +36,7 @@ export function InviteDialog() {
     setEnviando(false);
     if (!res.ok) { setErro(body.error ?? "Erro ao criar convite"); return; }
     setUrl(body.url);
+    router.refresh();
   }
 
   async function copiarLink() {
@@ -82,7 +85,7 @@ export function InviteDialog() {
                 </SelectContent>
               </Select>
             </div>
-            {erro && <p className="text-sm text-destructive">{erro}</p>}
+            {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
             <Button
               className="w-full"
               disabled={!email.includes("@") || enviando}

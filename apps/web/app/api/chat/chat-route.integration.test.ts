@@ -40,7 +40,7 @@ const authState = { userId: "", name: "", email: "" };
 
 vi.mock("@/lib/auth", () => ({
   auth: async () => ({
-    user: { id: authState.userId, name: authState.name, email: authState.email, role: "member" },
+    user: { id: authState.userId, name: authState.name, email: authState.email, role: "member", sessionVersion: 1 },
   }),
 }));
 

@@ -43,7 +43,7 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
         <Label htmlFor="password">Senha (mín. 8 caracteres)</Label>
         <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" />
       </div>
-      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       <Button type="submit" className="w-full" disabled={carregando}>
         {carregando ? "Criando conta..." : "Criar conta"}
       </Button>

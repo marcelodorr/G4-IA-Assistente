@@ -33,7 +33,7 @@ export function LoginForm() {
         <Label htmlFor="password">Senha</Label>
         <Input id="password" name="password" type="password" required autoComplete="current-password" />
       </div>
-      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       <Button type="submit" className="w-full" disabled={carregando}>
         {carregando ? "Entrando..." : "Entrar"}
       </Button>
