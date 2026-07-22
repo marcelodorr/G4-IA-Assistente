@@ -86,16 +86,23 @@ Nos logs do serviço `app`, procure por:
 
 Se o banco ainda estiver reiniciando, o container do app sairá e será reiniciado automaticamente pela política `restart: unless-stopped`.
 
-## 6. Configure o domínio
+## 6. Domínio
 
-Na aba **Domains** do Compose:
+O `docker-compose.yml` já contém o roteamento Traefik para:
 
-1. clique em **Add Domain**;
-2. selecione o serviço `app`;
-3. use a porta interna `3000`;
-4. use `/` como path e internal path;
-5. configure domínio e HTTPS;
-6. salve e faça um novo deploy.
+```text
+https://sequorai.4growco.com
+```
+
+Ele também redireciona HTTP para HTTPS e solicita o certificado pelo resolver `letsencrypt` do Dokploy. Depois de enviar o Compose atualizado ao Git, faça um novo deploy para o Traefik carregar as labels.
+
+Na aba **Domains** do Compose, remova uma configuração antiga para o mesmo host se ela apontar para outro serviço ou porta. Se preferir manter o domínio gerenciado pelo painel, ele deve usar:
+
+- serviço `app`;
+- porta interna `3000`;
+- path `/`;
+- internal path `/`;
+- Strip Path desativado.
 
 Não associe um domínio ao banco e não publique a porta `5432`.
 

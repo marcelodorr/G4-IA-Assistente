@@ -18,7 +18,7 @@ try {
   console.log("[start] migrations ok");
 } catch (e) {
   if (String(e).includes("vector")) {
-    console.error("[start] ERRO: extensão pgvector indisponível neste Postgres. Use a imagem pgvector/pgvector ou um Postgres do Railway com pgvector.");
+    console.error("[start] ERRO: extensão pgvector indisponível neste Postgres. Use uma imagem pgvector/pgvector compatível no Railway ou Dokploy.");
   }
   throw e;
 } finally {

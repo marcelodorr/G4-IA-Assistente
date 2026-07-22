@@ -17,6 +17,20 @@ services:
       - app_data:/data
     networks:
       - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.services.sequorai.loadbalancer.server.port=3000"
+      - "traefik.http.routers.sequorai-http.rule=Host(`sequorai.4growco.com`)"
+      - "traefik.http.routers.sequorai-http.entrypoints=web"
+      - "traefik.http.routers.sequorai-http.middlewares=sequorai-https-redirect"
+      - "traefik.http.routers.sequorai-http.service=sequorai"
+      - "traefik.http.middlewares.sequorai-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.sequorai-https.rule=Host(`sequorai.4growco.com`)"
+      - "traefik.http.routers.sequorai-https.entrypoints=websecure"
+      - "traefik.http.routers.sequorai-https.tls=true"
+      - "traefik.http.routers.sequorai-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sequorai-https.service=sequorai"
     healthcheck:
       test:
         - CMD
