@@ -1,6 +1,6 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { generateBudgetDocument, generateDocument, generateImage, generatePresentation, generateSpreadsheet } from "@/lib/services/artifacts";
+import { generateBudgetDocument, generateDocument, generatePresentation, generateSpreadsheet, queueImageGeneration } from "@/lib/services/artifacts";
 import type { Db } from "@/lib/db";
 import type { AgentType } from "@/lib/ai/agent-types";
 
@@ -34,7 +34,16 @@ export function createAgentTools(db: Db, agentType: AgentType, owner: Owner, opt
         size: z.enum(["1024x1024", "1024x1536", "1536x1024"]).default("1024x1024"),
         quality: z.enum(["low", "medium", "high"]).default("medium"),
       }),
-      execute: async (input) => { options?.beforeCall?.(); return artifactResult(await generateImage(db, owner, input)); },
+      execute: async (input) => {
+        options?.beforeCall?.();
+        const job = await queueImageGeneration(db, owner, input);
+        return {
+          success: true,
+          pending: true,
+          ...job,
+          instruction: "Informe que a imagem está sendo gerada e aparecerá para download assim que estiver pronta.",
+        };
+      },
     }),
   };
 

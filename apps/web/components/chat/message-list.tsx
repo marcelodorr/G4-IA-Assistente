@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { FileText } from "lucide-react";
 import type { UIMessage } from "ai";
 import { Markdown } from "./markdown";
+import { ArtifactJobChip } from "./artifact-job-chip";
 
 type MessagePart = UIMessage["parts"][number];
 
@@ -50,6 +51,7 @@ function ToolChip({ part }: { part: MessagePart }) {
   const name = part.type.slice("tool-".length);
   const output = "output" in part && part.output && typeof part.output === "object" ? part.output as Record<string, unknown> : null;
   const downloadUrl = typeof output?.downloadUrl === "string" && output.downloadUrl.startsWith("/api/artifacts/") ? output.downloadUrl : null;
+  const statusUrl = typeof output?.statusUrl === "string" && output.statusUrl.startsWith("/api/artifact-jobs/") ? output.statusUrl : null;
   const filename = typeof output?.filename === "string" ? output.filename : "arquivo gerado";
   const actionLabel: Record<string, string> = {
     buscarConhecimento: "Consultando base de conhecimento",
@@ -58,6 +60,7 @@ function ToolChip({ part }: { part: MessagePart }) {
     gerarApresentacao: "Gerando apresentação",
     gerarDocumento: "Gerando documento",
   };
+  if (statusUrl && done && !failed) return <ArtifactJobChip statusUrl={statusUrl} />;
   if (downloadUrl && done && !failed) return <a className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:underline" href={downloadUrl}>↓ Baixar {filename}</a>;
   return (
     <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-secondary/60 px-3 py-1 text-xs text-muted-foreground">

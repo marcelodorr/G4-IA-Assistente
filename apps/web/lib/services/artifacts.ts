@@ -2,14 +2,15 @@ import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import PptxGenJS from "pptxgenjs";
 import * as XLSX from "xlsx";
-import { eq } from "drizzle-orm";
-import { artifacts } from "@/lib/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
+import { artifactJobs, artifacts } from "@/lib/db/schema";
 import { getOpenAIKey } from "@/lib/services/settings";
 import { saveArtifact } from "@/lib/files/storage";
 import type { Db } from "@/lib/db";
 import { recordGenerationUsage } from "@/lib/services/usage";
 
 type ArtifactOwner = { userId: string; conversationId: string; assistantId?: string | null };
+type ImageInput = { prompt: string; size: "1024x1024" | "1024x1536" | "1536x1024"; quality: "low" | "medium" | "high" };
 type Section = { heading: string; content: string };
 type Slide = { title: string; bullets: string[] };
 
@@ -149,7 +150,7 @@ export async function generatePresentation(db: Db, owner: ArtifactOwner, input: 
   return persistArtifact(db, owner, { buffer: Buffer.from(output as Uint8Array), filename: `${basename}.pptx`, mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", kind: "presentation" });
 }
 
-export async function generateImage(db: Db, owner: ArtifactOwner, input: { prompt: string; size: "1024x1024" | "1024x1536" | "1536x1024"; quality: "low" | "medium" | "high" }) {
+export async function generateImage(db: Db, owner: ArtifactOwner, input: ImageInput) {
   const startedAt = Date.now();
   try {
     const key = await getOpenAIKey(db);
@@ -158,7 +159,7 @@ export async function generateImage(db: Db, owner: ArtifactOwner, input: { promp
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-2", prompt: input.prompt, size: input.size, quality: input.quality, output_format: "png" }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(300_000),
     });
     const body = await response.json() as { data?: Array<{ b64_json?: string }>; error?: { message?: string } };
     if (!response.ok || !body.data?.[0]?.b64_json) throw new Error(body.error?.message ?? "Falha ao gerar imagem");
@@ -171,6 +172,60 @@ export async function generateImage(db: Db, owner: ArtifactOwner, input: { promp
       .catch((usageError) => console.error("[artefato] não foi possível registrar a falha da imagem", usageError));
     throw error;
   }
+}
+
+function publicImageError(error: unknown) {
+  if (error instanceof Error && error.name === "TimeoutError") return "A geração excedeu cinco minutos. Tente novamente.";
+  if (error instanceof Error && error.message) return error.message.slice(0, 1_000);
+  return "Não foi possível gerar a imagem.";
+}
+
+export async function processImageJob(db: Db, id: string) {
+  const [job] = await db.update(artifactJobs).set({
+    status: "processing",
+    error: null,
+    startedAt: new Date(),
+    finishedAt: null,
+  }).where(and(eq(artifactJobs.id, id), inArray(artifactJobs.status, ["pending", "error"]))).returning();
+  if (!job) return;
+
+  try {
+    const options = job.options as Partial<Pick<ImageInput, "size" | "quality">>;
+    const artifact = await generateImage(db, {
+      userId: job.userId,
+      conversationId: job.conversationId!,
+      assistantId: job.assistantId,
+    }, {
+      prompt: job.prompt,
+      size: options.size ?? "1024x1024",
+      quality: options.quality ?? "medium",
+    });
+    await db.update(artifactJobs).set({ status: "ready", artifactId: artifact.id, finishedAt: new Date() }).where(eq(artifactJobs.id, id));
+  } catch (error) {
+    await db.update(artifactJobs).set({ status: "error", error: publicImageError(error), finishedAt: new Date() }).where(eq(artifactJobs.id, id));
+  }
+}
+
+export async function queueImageGeneration(db: Db, owner: ArtifactOwner, input: ImageInput) {
+  const [job] = await db.insert(artifactJobs).values({
+    ...owner,
+    prompt: input.prompt,
+    options: { size: input.size, quality: input.quality },
+  }).returning({ id: artifactJobs.id });
+  void processImageJob(db, job.id).catch((error) => console.error("[artefato] falha inesperada no job de imagem", error));
+  return { jobId: job.id, statusUrl: `/api/artifact-jobs/${job.id}` };
+}
+
+export async function getArtifactJob(db: Db, id: string) {
+  return (await db.select().from(artifactJobs).where(eq(artifactJobs.id, id)))[0] ?? null;
+}
+
+export async function retryImageJob(db: Db, id: string) {
+  await db.update(artifactJobs).set({ status: "pending", error: null, startedAt: null, finishedAt: null }).where(and(
+    eq(artifactJobs.id, id),
+    inArray(artifactJobs.status, ["error", "processing"]),
+  ));
+  void processImageJob(db, id).catch((error) => console.error("[artefato] falha inesperada ao repetir job de imagem", error));
 }
 
 export async function getArtifact(db: Db, id: string) {

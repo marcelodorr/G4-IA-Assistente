@@ -128,15 +128,20 @@ export const POST = apiHandler(async (req) => {
         )).limit(1).then((rows) => rows[0]),
       ),
     });
-    let toolCalls = 0;
-    const beforeToolCall = () => {
-      toolCalls += 1;
-      if (toolCalls > CHAT_LIMITS.maxToolCalls) throw new Error("Limite de ferramentas desta resposta atingido");
+    let knowledgeCalls = 0;
+    const beforeKnowledgeCall = () => {
+      knowledgeCalls += 1;
+      if (knowledgeCalls > 1) throw new Error("A base de conhecimento já foi consultada nesta resposta");
+    };
+    let agentCalls = 0;
+    const beforeAgentCall = () => {
+      agentCalls += 1;
+      if (agentCalls > 1) throw new Error("Uma geração já foi iniciada nesta resposta");
     };
     const knowledgeTools: ToolSet = temBase ? {
       buscarConhecimento: makeKnowledgeTool(db, openai, assistant?.id ?? null, {
         beforeCall: () => {
-          beforeToolCall();
+          beforeKnowledgeCall();
         },
         onEmbeddingUsage: (usage) => recordEmbeddingUsage(db, {
           ...usage,
@@ -149,7 +154,7 @@ export const POST = apiHandler(async (req) => {
       userId: session.user.id,
       conversationId: body.conversationId,
       assistantId: assistant?.id,
-    }, { beforeCall: beforeToolCall });
+    }, { beforeCall: beforeAgentCall });
     const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools } : undefined;
     let failurePersistence: Promise<void> | null = null;
     const markInterrupted = (reason: string) => {

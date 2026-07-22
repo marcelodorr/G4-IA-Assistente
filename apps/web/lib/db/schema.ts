@@ -183,6 +183,25 @@ export const artifacts = pgTable("artifacts", {
   index("artifacts_conversation_idx").on(t.conversationId),
 ]);
 
+export const artifactJobs = pgTable("artifact_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
+  kind: text("kind", { enum: ["image"] }).notNull().default("image"),
+  status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
+  prompt: text("prompt").notNull(),
+  options: jsonb("options").notNull().default({}),
+  artifactId: uuid("artifact_id").references(() => artifacts.id, { onDelete: "set null" }),
+  error: text("error"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("artifact_jobs_user_created_idx").on(t.userId, t.createdAt),
+  index("artifact_jobs_status_idx").on(t.status),
+]);
+
 export const aiUsage = pgTable("ai_usage", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
