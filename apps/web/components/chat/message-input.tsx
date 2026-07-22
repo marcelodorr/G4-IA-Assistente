@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { CHAT_LIMITS } from "@/lib/ai/chat-policy";
+import { Input } from "@/components/ui/input";
+import { LinkIcon } from "lucide-react";
 
 // Formato compatível com FileUIPart (pacote "ai"): sendMessage({ text, files })
 // aceita FileList | FileUIPart[], e é isso que anexamos aqui.
@@ -19,6 +21,9 @@ export function MessageInput({
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [mostrarLink, setMostrarLink] = useState(false);
+  const [enviandoLink, setEnviandoLink] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function attach(e: React.ChangeEvent<HTMLInputElement>) {
@@ -46,6 +51,22 @@ export function MessageInput({
     }
   }
 
+  async function attachLink() {
+    if (!linkUrl.trim()) return;
+    if (files.length >= CHAT_LIMITS.maxAttachments) return toast.error(`Envie no máximo ${CHAT_LIMITS.maxAttachments} anexos`);
+    setEnviandoLink(true);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: linkUrl.trim() }) });
+      if (!res.ok) return toast.error((await res.json()).error ?? "Falha ao adicionar site");
+      const meta = await res.json();
+      setFiles((current) => [...current, { type: "file", url: meta.url, mediaType: meta.mediaType, filename: meta.filename }]);
+      setLinkUrl("");
+      setMostrarLink(false);
+    } finally {
+      setEnviandoLink(false);
+    }
+  }
+
   function submit() {
     if (disabled) return;
     if (!text.trim() && files.length === 0) return;
@@ -56,6 +77,12 @@ export function MessageInput({
 
   return (
     <div className="border-t p-4">
+      {mostrarLink && (
+        <div className="mb-2 flex gap-2">
+          <Input type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void attachLink(); } }} placeholder="https://www.exemplo.com.br/pagina" autoFocus />
+          <Button variant="outline" disabled={enviandoLink || !linkUrl.trim()} onClick={() => void attachLink()}>{enviandoLink ? "Capturando..." : "Adicionar"}</Button>
+        </div>
+      )}
       {files.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {files.map((f, i) => (
@@ -73,7 +100,7 @@ export function MessageInput({
           ref={inputRef}
           type="file"
           hidden
-          accept=".png,.jpg,.jpeg,.webp,.pdf,.xlsx,.xls,.txt,.md,.csv,.json,.yaml,.yml"
+          accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml,.webp"
           onChange={attach}
         />
         <Button
@@ -85,6 +112,7 @@ export function MessageInput({
         >
           +
         </Button>
+        <Button variant="outline" size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

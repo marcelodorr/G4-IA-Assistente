@@ -15,7 +15,16 @@ export const GET = apiHandler(async (_req, { params }) => {
     : null;
   if (!upload && !globalFile) return Response.json({ error: "Arquivo não encontrado" }, { status: 404 });
   const { buf, mime } = await readUpload(name);
+  const activeContent = mime === "text/html" || mime === "application/xhtml+xml" || mime === "image/svg+xml";
   return new Response(new Uint8Array(buf), {
-    headers: { "Content-Type": mime, "Cache-Control": "private, max-age=3600" },
+    headers: {
+      "Content-Type": mime,
+      "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+      ...(activeContent ? {
+        "Content-Disposition": "attachment",
+        "Content-Security-Policy": "sandbox; default-src 'none'",
+      } : {}),
+    },
   });
 });

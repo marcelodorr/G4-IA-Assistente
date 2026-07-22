@@ -4,6 +4,7 @@ import { saveUpload, KB_MIMES } from "@/lib/files/storage";
 import { startIngestion } from "@/lib/rag/ingest";
 import { apiHandler, requireAdmin } from "@/lib/services/guards";
 import { desc, eq } from "drizzle-orm";
+import { fetchExternalSite } from "@/lib/files/external-site";
 
 export const GET = apiHandler(async (_req, { params }) => {
   await requireAdmin();
@@ -20,13 +21,29 @@ export const GET = apiHandler(async (_req, { params }) => {
 export const POST = apiHandler(async (req, { params }) => {
   await requireAdmin();
   const { id } = await params;
-  const form = await req.formData();
-  const file = form.get("file") as File | null;
-  if (!file) return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
-  const buf = Buffer.from(await file.arrayBuffer());
-  const { storedName, mime } = await saveUpload(buf, file.name, file.type, KB_MIMES);
+  const isJson = req.headers.get("content-type")?.includes("application/json");
+  let buf: Buffer;
+  let filename: string;
+  let inputMime: string;
+  if (isJson) {
+    const body = await req.json() as { url?: unknown };
+    if (typeof body.url !== "string") return Response.json({ error: "Informe o link do site" }, { status: 400 });
+    const site = await fetchExternalSite(body.url);
+    buf = site.buffer;
+    filename = site.url;
+    inputMime = site.mime;
+  } else {
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
+    buf = Buffer.from(await file.arrayBuffer());
+    filename = file.name;
+    inputMime = file.type;
+  }
+  const storageFilename = /^https?:\/\//.test(filename) ? `site-${new URL(filename).hostname}.html` : filename;
+  const { storedName, mime } = await saveUpload(buf, storageFilename, inputMime, KB_MIMES);
   const [row] = await db.insert(assistantFiles).values({
-    assistantId: id, filename: file.name, mime, size: buf.byteLength, storagePath: storedName,
+    assistantId: id, filename, mime, size: buf.byteLength, storagePath: storedName,
   }).returning();
   startIngestion(db, row.id);
   return Response.json(row, { status: 202 });

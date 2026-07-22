@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2Icon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -26,6 +27,10 @@ function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isExternalSource(value: string) {
+  return value.startsWith("https://") || value.startsWith("http://");
 }
 
 function isStale(file: AssistantFileRow) {
@@ -70,6 +75,8 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
   const [files, setFiles] = useState<AssistantFileRow[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [adicionandoSite, setAdicionandoSite] = useState(false);
+  const [siteUrl, setSiteUrl] = useState("");
   const [removendoId, setRemovendoId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -113,6 +120,17 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
     if (arquivo) enviarArquivo(arquivo);
   }
 
+  async function adicionarSite() {
+    if (!siteUrl.trim()) return;
+    setAdicionandoSite(true);
+    const res = await fetch(`/api/assistants/${assistantId}/files`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: siteUrl.trim() }) });
+    setAdicionandoSite(false);
+    if (!res.ok) return toast.error((await res.json()).error ?? "Erro ao adicionar site");
+    setSiteUrl("");
+    toast.success("Site enviado para indexação");
+    await carregar();
+  }
+
   async function remover(file: AssistantFileRow) {
     setRemovendoId(file.id);
     const res = await fetch(`/api/assistants/${assistantId}/files/${file.id}`, { method: "DELETE" });
@@ -137,13 +155,13 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          PDFs e planilhas usados como referência pelo assistente nas respostas.
+          Markdown, imagens, SVG, Excel, Word, PowerPoint e HTML usados como referência pelo assistente.
         </p>
         <div>
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.xlsx,.xls"
+            accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml"
             className="hidden"
             onChange={onFileChange}
           />
@@ -157,6 +175,10 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
           </Button>
         </div>
       </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input type="url" value={siteUrl} onChange={(event) => setSiteUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void adicionarSite(); } }} placeholder="https://www.exemplo.com.br/pagina" aria-label="Link de site externo" />
+        <Button type="button" variant="outline" disabled={adicionandoSite || !siteUrl.trim()} onClick={() => void adicionarSite()}>{adicionandoSite ? "Capturando..." : "Adicionar site"}</Button>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -169,7 +191,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
         <TableBody>
           {files.map((file) => (
             <TableRow key={file.id}>
-              <TableCell className="font-medium">{file.filename}</TableCell>
+              <TableCell className="font-medium">{isExternalSource(file.filename) ? <a className="hover:underline" href={file.filename} target="_blank" rel="noreferrer">{file.filename}</a> : file.filename}</TableCell>
               <TableCell className="text-muted-foreground">{formatSize(file.size)}</TableCell>
               <TableCell>
                 {isStale(file) ? <Badge variant="destructive">Processamento travado</Badge> : <StatusBadge status={file.status} error={file.error} />}

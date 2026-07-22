@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -42,6 +43,10 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function isExternalSource(value: string) {
+  return value.startsWith("https://") || value.startsWith("http://");
+}
+
 function FileStatus({ file }: { file: ContextFile }) {
   if (file.stale) return <Badge variant="destructive">Processamento travado</Badge>;
   if (file.status === "ready") return <Badge className="bg-emerald-600">Pronto</Badge>;
@@ -56,6 +61,8 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
   const [memories, setMemories] = useState<CorporateMemory[]>(initialMemories);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [addingSite, setAddingSite] = useState(false);
+  const [siteUrl, setSiteUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [busyFile, setBusyFile] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +123,17 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
     await loadFiles();
   }
 
+  async function addSite() {
+    if (!siteUrl.trim()) return;
+    setAddingSite(true);
+    const response = await fetch("/api/context/files", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: siteUrl.trim() }) });
+    setAddingSite(false);
+    if (!response.ok) return toast.error((await response.json()).error ?? "Erro ao adicionar site");
+    setSiteUrl("");
+    toast.success("Site enviado para indexação");
+    await loadFiles();
+  }
+
   async function fileAction(file: ContextFile, method: "POST" | "DELETE") {
     setBusyFile(file.id);
     const response = await fetch(`/api/context/files/${file.id}`, { method });
@@ -140,16 +158,20 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
         <CardHeader><CardTitle>Documentos, skills e arquivos</CardTitle><CardDescription>Conteúdo indexado na base geral e pesquisado em qualquer conversa quando for relevante.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">Aceita PDF, Excel, TXT, Markdown/SKILL.md, CSV, JSON e YAML, até 20 MB.</p>
-            <input ref={inputRef} className="hidden" type="file" accept=".pdf,.xlsx,.xls,.txt,.md,.csv,.json,.yaml,.yml" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
+            <p className="text-sm text-muted-foreground">Aceita Markdown, JPG/JPEG, PNG, SVG, Excel, Word, PowerPoint e HTML, até 20 MB.</p>
+            <input ref={inputRef} className="hidden" type="file" accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
             <Button variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? "Enviando..." : "Adicionar arquivo"}</Button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input type="url" value={siteUrl} onChange={(event) => setSiteUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addSite(); } }} placeholder="https://www.exemplo.com.br/pagina" aria-label="Link de site externo" />
+            <Button variant="outline" disabled={addingSite || !siteUrl.trim()} onClick={() => void addSite()}>{addingSite ? "Capturando..." : "Adicionar site"}</Button>
           </div>
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader><TableRow><TableHead>Arquivo</TableHead><TableHead>Origem</TableHead><TableHead>Tamanho</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
                 {files.map((file) => <TableRow key={file.id}>
-                  <TableCell className="font-medium"><a className="hover:underline" href={`/api/files/${file.storagePath}`}>{file.filename}</a></TableCell><TableCell><div>{file.sourceType === "admin" ? "Administrador" : "Conversa"}</div>{file.sourceUserName && <div className="text-xs text-muted-foreground">{file.sourceUserName}</div>}</TableCell><TableCell>{formatSize(file.size)}</TableCell><TableCell><FileStatus file={file} /></TableCell>
+                  <TableCell className="font-medium"><a className="hover:underline" href={isExternalSource(file.filename) ? file.filename : `/api/files/${file.storagePath}`} target={isExternalSource(file.filename) ? "_blank" : undefined} rel="noreferrer">{file.filename}</a></TableCell><TableCell><div>{file.sourceType === "admin" ? "Administrador" : "Conversa"}</div>{file.sourceUserName && <div className="text-xs text-muted-foreground">{file.sourceUserName}</div>}</TableCell><TableCell>{formatSize(file.size)}</TableCell><TableCell><FileStatus file={file} /></TableCell>
                   <TableCell><div className="flex justify-end gap-1">{(file.status === "error" || file.stale) && <Button size="sm" variant="outline" disabled={busyFile === file.id} onClick={() => void fileAction(file, "POST")}>Tentar novamente</Button>}<Button size="icon-sm" variant="ghost" aria-label={`Remover ${file.filename}`} disabled={busyFile === file.id} onClick={() => void fileAction(file, "DELETE")}><XIcon /></Button></div></TableCell>
                 </TableRow>)}
                 {files.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum arquivo no contexto geral.</TableCell></TableRow>}

@@ -27,6 +27,16 @@ describe("storage", () => {
     expect(saved.mime).toBe("text/markdown");
   });
 
+  it.each([
+    ["imagem.jpeg", "image/jpeg"],
+    ["vetor.svg", "image/svg+xml"],
+    ["manual.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+    ["slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+    ["pagina.html", "text/html"],
+  ])("reconhece %s pela extensão", async (filename, mime) => {
+    await expect(saveUpload(Buffer.from("conteúdo"), filename, "", KB_MIMES)).resolves.toMatchObject({ mime });
+  });
+
   it("rejeita arquivo acima do limite", async () => {
     const grande = Buffer.alloc(MAX_UPLOAD_BYTES + 1);
     await expect(saveUpload(grande, "a.pdf", "application/pdf", CHAT_MIMES)).rejects.toThrow(/20 ?MB/i);

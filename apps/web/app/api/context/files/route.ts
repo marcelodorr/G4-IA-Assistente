@@ -4,6 +4,7 @@ import { KB_MIMES, saveUpload } from "@/lib/files/storage";
 import { startGlobalContextIngestion } from "@/lib/rag/ingest";
 import { apiHandler, requireAdmin } from "@/lib/services/guards";
 import { listGlobalContextFiles } from "@/lib/services/global-context";
+import { fetchExternalSite } from "@/lib/files/external-site";
 
 export const GET = apiHandler(async () => {
   await requireAdmin();
@@ -17,13 +18,29 @@ export const GET = apiHandler(async () => {
 
 export const POST = apiHandler(async (req) => {
   const session = await requireAdmin();
-  const form = await req.formData();
-  const file = form.get("file");
-  if (!(file instanceof File)) return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const { storedName, mime } = await saveUpload(buffer, file.name, file.type, KB_MIMES);
+  const isJson = req.headers.get("content-type")?.includes("application/json");
+  let buffer: Buffer;
+  let filename: string;
+  let inputMime: string;
+  if (isJson) {
+    const body = await req.json() as { url?: unknown };
+    if (typeof body.url !== "string") return Response.json({ error: "Informe o link do site" }, { status: 400 });
+    const site = await fetchExternalSite(body.url);
+    buffer = site.buffer;
+    filename = site.url;
+    inputMime = site.mime;
+  } else {
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
+    buffer = Buffer.from(await file.arrayBuffer());
+    filename = file.name;
+    inputMime = file.type;
+  }
+  const storageFilename = /^https?:\/\//.test(filename) ? `site-${new URL(filename).hostname}.html` : filename;
+  const { storedName, mime } = await saveUpload(buffer, storageFilename, inputMime, KB_MIMES);
   const [row] = await db.insert(globalContextFiles).values({
-    filename: file.name,
+    filename,
     mime,
     size: buffer.byteLength,
     storagePath: storedName,

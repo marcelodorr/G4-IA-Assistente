@@ -7,6 +7,13 @@ export const KB_MIMES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/png",
+  "image/jpeg",
+  "image/svg+xml",
+  "text/html",
+  "application/xhtml+xml",
   "text/plain",
   "text/markdown",
   "text/csv",
@@ -18,10 +25,13 @@ export const KB_MIMES = [
 export const CHAT_MIMES = ["image/png", "image/jpeg", "image/webp", ...KB_MIMES];
 
 const EXT_MIME: Record<string, string> = {
-  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".webp": "image/webp",
   ".pdf": "application/pdf",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ".xls": "application/vnd.ms-excel",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".html": "text/html", ".htm": "text/html",
   ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv",
   ".json": "application/json", ".yaml": "application/yaml", ".yml": "application/yaml",
 };
