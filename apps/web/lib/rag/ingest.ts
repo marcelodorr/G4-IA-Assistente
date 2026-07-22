@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import { embedMany } from "ai";
-import { assistantFiles, chunks } from "@/lib/db/schema";
+import { assistantFiles, assistants, chunks } from "@/lib/db/schema";
 import { readUpload } from "@/lib/files/storage";
 import { extractTextFromFile } from "./extract";
 import { chunkText } from "./chunking";
 import { getProvider } from "@/lib/ai/provider";
 import type { Db } from "@/lib/db";
+import { recordEmbeddingUsage } from "@/lib/services/usage";
 
 type Deps = { embed: (texts: string[]) => Promise<number[][]> };
 
@@ -37,11 +38,25 @@ export async function ingestFile(db: Db, fileId: string, deps: Deps) {
 export function startIngestion(db: Db, fileId: string) {
   const realEmbed = async (texts: string[]) => {
     const openai = await getProvider(db);
-    const { embeddings } = await embedMany({
-      model: openai.textEmbeddingModel("text-embedding-3-small"),
-      values: texts,
-    });
-    return embeddings;
+    const startedAt = Date.now();
+    const [owner] = await db.select({ userId: assistants.createdBy }).from(assistantFiles)
+      .innerJoin(assistants, eq(assistantFiles.assistantId, assistants.id))
+      .where(eq(assistantFiles.id, fileId));
+    try {
+      const { embeddings, usage } = await embedMany({
+        model: openai.textEmbeddingModel("text-embedding-3-small"),
+        values: texts,
+      });
+      if (owner?.userId) {
+        await recordEmbeddingUsage(db, { userId: owner.userId, tokens: usage.tokens, durationMs: Date.now() - startedAt, success: true });
+      }
+      return embeddings;
+    } catch (error) {
+      if (owner?.userId) {
+        await recordEmbeddingUsage(db, { userId: owner.userId, tokens: 0, durationMs: Date.now() - startedAt, success: false });
+      }
+      throw error;
+    }
   };
   void ingestFile(db, fileId, { embed: realEmbed }).catch((e) => {
     console.error(`[ingestão] falha no arquivo ${fileId}:`, e);

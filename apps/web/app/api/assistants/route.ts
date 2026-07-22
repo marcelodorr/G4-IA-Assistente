@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { createAssistant, listAssistants } from "@/lib/services/assistants";
 import { apiHandler, requireAdmin, requireSession } from "@/lib/services/guards";
+import { getSettings } from "@/lib/services/settings";
+import { isModelEnabled } from "@/lib/ai/models";
 
 export const GET = apiHandler(async (req) => {
   const session = await requireSession();
@@ -18,6 +20,10 @@ export const GET = apiHandler(async (req) => {
 export const POST = apiHandler(async (req) => {
   const session = await requireAdmin();
   const { name, systemPrompt, description, model } = await req.json();
+  const settings = await getSettings(db);
+  if (model && !isModelEnabled(model, settings.disabledModels)) {
+    return Response.json({ error: "Modelo inválido ou desabilitado" }, { status: 400 });
+  }
   const row = await createAssistant(db, { name, systemPrompt, description, model, createdBy: session.user.id });
   return Response.json(row, { status: 201 });
 });

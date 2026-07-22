@@ -380,6 +380,8 @@ Para uma instalação pequena, o volume Railway é suficiente. Para múltiplas i
 
 **Objetivo:** tornar mensagens confiáveis, previsíveis e financeiramente controladas.
 
+**Status:** ✅ implementada em 22/07/2026. Consulte `docs/controle-de-uso-ia.md` para operação, limites e deploy.
+
 ### 4.1 Não confiar no histórico enviado pelo navegador
 
 **Prioridade:** alta

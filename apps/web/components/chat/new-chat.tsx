@@ -11,9 +11,11 @@ import type { AssistantSummary } from "@/lib/services/assistants";
 export function NewChat({
   assistants,
   defaultModel,
+  models,
 }: {
   assistants: AssistantSummary[];
   defaultModel: string;
+  models: string[];
 }) {
   const router = useRouter();
   const [assistantId, setAssistantId] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export function NewChat({
       <div className="w-full max-w-xl space-y-3">
         <div className="flex gap-2">
           <AssistantPicker assistants={assistants} value={assistantId} onChange={setAssistantId} />
-          <ModelPicker value={model} onChange={setModel} />
+          <ModelPicker value={model} onChange={setModel} models={models} />
         </div>
         <MessageInput onSend={onSend} disabled={criando} />
       </div>

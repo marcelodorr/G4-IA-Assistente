@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
-import { createConversation, listConversations, getConversation, replaceMessages, deleteConversation } from "./conversations";
+import { appendChatTurn, createConversation, deleteConversation, finishAssistantMessage, getConversation, listConversations } from "./conversations";
 import { users } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
@@ -16,10 +16,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("conversations", () => {
     const db = await getTestDb();
     const u = await makeUser(db);
     const conv = await createConversation(db, { userId: u.id });
-    await replaceMessages(db, conv.id, [
-      { role: "user", parts: [{ type: "text", text: "Oi" }] },
-      { role: "assistant", parts: [{ type: "text", text: "Olá!" }] },
-    ]);
+    const turn = await appendChatTurn(db, { conversationId: conv.id, clientId: "client-1", userParts: [{ type: "text", text: "Oi" }] });
+    await finishAssistantMessage(db, turn.assistantMessage.id, { parts: [{ type: "text", text: "Olá!" }], status: "completed" });
     const got = await getConversation(db, conv.id, u.id);
     expect(got!.messages).toHaveLength(2);
     expect(await listConversations(db, u.id)).toHaveLength(1);
@@ -35,13 +33,12 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("conversations", () => {
     expect(await getConversation(db, conv.id, dono.id)).not.toBeNull();
   });
 
-  it("replaceMessages é idempotente (substitui tudo)", async () => {
+  it("não duplica uma mensagem reenviada pelo cliente", async () => {
     const db = await getTestDb();
     const u = await makeUser(db);
     const conv = await createConversation(db, { userId: u.id });
-    const msgs = [{ role: "user" as const, parts: [{ type: "text", text: "A" }] }];
-    await replaceMessages(db, conv.id, msgs);
-    await replaceMessages(db, conv.id, [...msgs, { role: "assistant" as const, parts: [{ type: "text", text: "B" }] }]);
+    await appendChatTurn(db, { conversationId: conv.id, clientId: "mesma", userParts: [{ type: "text", text: "A" }] });
+    await expect(appendChatTurn(db, { conversationId: conv.id, clientId: "mesma", userParts: [{ type: "text", text: "A" }] })).rejects.toThrow(/já foi processada/);
     const got = await getConversation(db, conv.id, u.id);
     expect(got!.messages).toHaveLength(2);
   });

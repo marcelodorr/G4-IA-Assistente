@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { CHAT_LIMITS } from "@/lib/ai/chat-policy";
 
 // Formato compatível com FileUIPart (pacote "ai"): sendMessage({ text, files })
 // aceita FileList | FileUIPart[], e é isso que anexamos aqui.
@@ -23,6 +24,11 @@ export function MessageInput({
   async function attach(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (files.length >= CHAT_LIMITS.maxAttachments) {
+      toast.error(`Envie no máximo ${CHAT_LIMITS.maxAttachments} anexos`);
+      e.target.value = "";
+      return;
+    }
     setEnviandoArquivo(true);
     const form = new FormData();
     form.append("file", file);
@@ -90,6 +96,7 @@ export function MessageInput({
           }}
           placeholder="Envie uma mensagem..."
           rows={1}
+          maxLength={CHAT_LIMITS.maxMessageChars}
           className="max-h-40 min-h-[44px] resize-none"
         />
         <Button onClick={submit} disabled={disabled}>
@@ -97,7 +104,7 @@ export function MessageInput({
         </Button>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        O Sequor IA Assistente pode cometer erros. Confira informações importantes.
+        Até {CHAT_LIMITS.maxMessageChars.toLocaleString("pt-BR")} caracteres e {CHAT_LIMITS.maxAttachments} anexos. O Sequor IA Assistente pode cometer erros.
       </p>
     </div>
   );

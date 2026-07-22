@@ -10,9 +10,9 @@ export default async function AdminConfiguracoesPage() {
     <main className="mx-auto max-w-2xl space-y-6 p-6">
       <div>
         <h1 className="font-heading text-xl font-medium">Configurações</h1>
-        <p className="text-sm text-muted-foreground">Gerencie a chave da OpenAI e o modelo padrão do sistema.</p>
+        <p className="text-sm text-muted-foreground">Gerencie a chave, os modelos e os limites de consumo da IA.</p>
       </div>
-      <SettingsForm defaultModel={settings.defaultModel} hasKey={settings.hasKey} />
+      <SettingsForm settings={settings} />
     </main>
   );
 }

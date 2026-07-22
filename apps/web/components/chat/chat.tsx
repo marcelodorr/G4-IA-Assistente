@@ -3,6 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { MessageList } from "./message-list";
 import { MessageInput, type Attachment } from "./message-input";
 
@@ -16,8 +17,13 @@ export function Chat({
   assistantName?: string | null;
 }) {
   const router = useRouter();
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat", body: { conversationId } }),
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: ({ messages }) => ({
+        body: { conversationId, message: messages.at(-1) },
+      }),
+    }),
     messages: initialMessages,
   });
   const enviouPendente = useRef(false);
@@ -37,6 +43,17 @@ export function Chat({
   useEffect(() => {
     if (status === "ready" && messages.length === 2) router.refresh();
   }, [status, messages.length, router]);
+
+  useEffect(() => {
+    if (error) {
+      let message = error.message;
+      try {
+        const parsed = JSON.parse(message) as { error?: string };
+        message = parsed.error ?? message;
+      } catch { /* resposta não estruturada */ }
+      toast.error(message || "Não foi possível enviar a mensagem");
+    }
+  }, [error]);
 
   function onSend(text: string, files: Attachment[]) {
     sendMessage({ text, files: files.length ? files : undefined });
