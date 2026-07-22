@@ -23,7 +23,7 @@ Este repositório é um monorepo (npm workspaces) com o app Next.js (`apps/web`)
 
 ## Deploy no Dokploy
 
-O repositório inclui um `docker-compose.yml` de produção com a aplicação, PostgreSQL/pgvector, healthchecks e volumes persistentes. Veja o passo a passo completo em **[docs/implantacao-dokploy.md](docs/implantacao-dokploy.md)**.
+O repositório inclui um `docker-compose.yml` de produção para conectar a aplicação a um PostgreSQL/pgvector gerenciado pelo Dokploy, com healthcheck e volume persistente para arquivos. Veja o passo a passo completo em **[docs/implantacao-dokploy.md](docs/implantacao-dokploy.md)**.
 
 ## Licença
 

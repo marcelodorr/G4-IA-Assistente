@@ -13,7 +13,7 @@ G4-IA-Assistente/
 ├── packages/
 │   └── cli/           # CLI publicada no npm como `g4-ia-assistente`
 ├── Dockerfile          # build da imagem de produção
-├── docker-compose.yml  # app + PostgreSQL/pgvector para o Dokploy
+├── docker-compose.yml  # app conectado ao PostgreSQL/pgvector do Dokploy
 ├── railway.json        # config de deploy no Railway (build via Dockerfile + healthcheck)
 └── package.json         # raiz do workspace
 ```
@@ -80,12 +80,12 @@ Em produção, as migrations rodam automaticamente no boot do container (`apps/w
 
 ## Build de produção
 
-O deploy no Railway usa o `Dockerfile` da raiz. No Dokploy, o `docker-compose.yml` constrói exatamente esse mesmo Dockerfile e adiciona o serviço PostgreSQL/pgvector:
+O deploy no Railway usa o `Dockerfile` da raiz. No Dokploy, o `docker-compose.yml` constrói exatamente esse mesmo Dockerfile e conecta o app a um PostgreSQL/pgvector criado como banco gerenciado no painel:
 
 - Build multi-stage: instala dependências do workspace `apps/web`, roda `next build` (modo standalone) e monta uma imagem final enxuta (`node:22-alpine`) contendo apenas o output standalone, os estáticos, os arquivos públicos e as migrations do Drizzle.
 - No boot, `apps/web/scripts/start.mjs` roda as migrations pendentes contra `DATABASE_URL` e só então inicia o servidor Next.js.
 - `railway.json` configura o build via Dockerfile e um healthcheck em `/api/health` (checa conexão com o banco).
-- `docker-compose.yml` configura healthchecks, rede privada do banco e volumes persistentes do app e do Postgres para o Dokploy.
+- `docker-compose.yml` configura o healthcheck, a rede compartilhada do Dokploy e o volume persistente de arquivos. O banco e seus backups são gerenciados separadamente pelo Dokploy.
 
 Para testar o build de produção localmente:
 

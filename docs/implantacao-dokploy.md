@@ -1,101 +1,81 @@
 # Implantação no Dokploy
 
-Este guia coloca o G4 IA Assistente e seu banco PostgreSQL com pgvector no mesmo serviço Docker Compose do Dokploy.
+Este projeto usa dois recursos no Dokploy:
 
-O resultado terá:
+1. um banco PostgreSQL gerenciado pelo Dokploy, com pgvector;
+2. um serviço Docker Compose para a aplicação.
 
-- aplicação Next.js;
-- PostgreSQL 17 com pgvector;
-- migrations executadas automaticamente antes do app iniciar;
-- volume persistente para o banco;
-- volume persistente para PDFs, planilhas e anexos;
-- banco acessível somente pela rede interna do Compose;
-- acesso de saída do app à API da OpenAI;
-- healthchecks para o banco e para a aplicação.
+O app acessa o banco pela URL interna do Dokploy. O banco não precisa ter a porta `5432` exposta à internet.
 
-## Antes de começar
+## 1. Prepare o banco
 
-Você precisa de:
+Crie um banco PostgreSQL no mesmo servidor/ambiente do app.
 
-1. um servidor com Dokploy funcionando;
-2. este repositório disponível no GitHub ou em outro provedor Git;
-3. um domínio apontando para o IP do servidor, se quiser HTTPS com domínio próprio;
-4. acesso ao terminal local para gerar três segredos.
+O G4 IA Assistente exige a extensão pgvector. Antes do primeiro deploy do app, abra as configurações avançadas do banco e confirme que ele usa uma imagem pgvector compatível com a versão principal do PostgreSQL, por exemplo:
 
-O arquivo usado pelo deploy é `docker-compose.yml`, na raiz do repositório.
-
-## 1. Gere os segredos
-
-Rode os comandos abaixo no seu computador:
-
-```bash
-openssl rand -hex 24
-openssl rand -base64 32
-openssl rand -hex 32
+```text
+pgvector/pgvector:pg17
 ```
 
-Use as três saídas, na mesma ordem, como:
+Não altere um banco existente entre versões principais do PostgreSQL, como 16 para 17, apenas trocando a imagem. Para um banco já em uso, faça backup e siga um processo de upgrade do PostgreSQL.
 
-1. `POSTGRES_PASSWORD`;
-2. `AUTH_SECRET`;
-3. `ENCRYPTION_KEY`.
+Na página do banco, abra **Connection** e copie a **Internal Connection URL**. Ela terá este formato:
 
-Não reutilize os exemplos do repositório.
+```text
+postgresql://USUARIO:SENHA@HOST_INTERNO:5432/BANCO
+```
 
-> Guarde `ENCRYPTION_KEY` em um gerenciador de senhas. Ela protege a chave OpenAI armazenada no banco. Se for perdida, restaurar apenas o banco não será suficiente para recuperar essa configuração.
+Use a URL interna. Não habilite acesso externo ao banco apenas para conectar o app.
 
-## 2. Crie o serviço Compose
+## 2. Gere os segredos do app
+
+Rode no seu computador:
+
+```bash
+echo "AUTH_SECRET=$(openssl rand -hex 32)"
+echo "ENCRYPTION_KEY=$(openssl rand -hex 32)"
+```
+
+Guarde `ENCRYPTION_KEY` em um gerenciador de senhas. Ela protege a chave OpenAI armazenada no banco. Se essa chave for perdida, a configuração criptografada não poderá ser recuperada somente com o backup do banco.
+
+## 3. Crie o serviço Compose
 
 No Dokploy:
 
-1. crie ou abra um projeto;
-2. crie um serviço do tipo **Compose**;
-3. escolha **Docker Compose**, e não Docker Stack;
-4. conecte o provedor Git e selecione este repositório;
-5. selecione a branch que será usada em produção;
-6. informe `./docker-compose.yml` como **Compose Path**;
-7. salve a configuração;
-8. se a opção estiver disponível, habilite **Isolated Deployments**.
+1. crie um serviço do tipo **Compose**;
+2. escolha **Docker Compose**, e não Docker Stack;
+3. conecte o repositório Git;
+4. selecione a branch de produção;
+5. use `./docker-compose.yml` como **Compose Path**;
+6. salve.
 
-Docker Stack não deve ser usado neste projeto porque o Compose faz o build da imagem diretamente pelo `Dockerfile` do repositório.
+O Compose constrói o `Dockerfile` do repositório e conecta o app à rede externa `dokploy-network`, usada para alcançar o banco gerenciado e o proxy do Dokploy.
 
-## 3. Configure as variáveis
+## 4. Configure as variáveis
 
-Abra a aba **Environment** do serviço Compose e adicione:
+Abra a aba **Environment** do serviço Compose e informe:
 
 ```dotenv
-POSTGRES_PASSWORD=<resultado-do-primeiro-comando>
-POSTGRES_USER=postgres
-POSTGRES_DB=g4_assistente
-AUTH_SECRET=<resultado-do-segundo-comando>
-ENCRYPTION_KEY=<resultado-do-terceiro-comando>
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST_INTERNO:5432/BANCO
+AUTH_SECRET=<valor-gerado>
+ENCRYPTION_KEY=<64-caracteres-hexadecimais>
 ```
 
-O arquivo `dokploy.env.example` contém o mesmo modelo.
+Use como `DATABASE_URL` a **Internal Connection URL** copiada do banco. Não inclua aspas nem espaços ao redor do `=`.
 
-Não é necessário configurar `DATABASE_URL`: o Compose a monta usando o endereço interno do serviço `database`.
+O arquivo `dokploy.env.example` mostra apenas o formato. Nunca grave a conexão real no repositório.
 
-O Dokploy salva as variáveis da aba Environment em um arquivo `.env` ao lado do Compose. O `docker-compose.yml` referencia explicitamente cada variável necessária, portanto elas serão interpoladas no deploy.
-
-### Regras importantes para os valores
-
-- `ENCRYPTION_KEY` deve ter exatamente 64 caracteres hexadecimais.
-- Use uma senha hexadecimal em `POSTGRES_PASSWORD` para evitar caracteres reservados em URLs.
-- Nunca envie esses valores para o Git.
-- Não altere `ENCRYPTION_KEY` depois do primeiro setup sem antes planejar a rotação da chave OpenAI criptografada.
-
-## 4. Faça o primeiro deploy
+## 5. Faça o deploy
 
 Clique em **Deploy**.
 
-A ordem esperada é:
+No início do container, o app:
 
-1. o Dokploy constrói a imagem do app;
-2. o PostgreSQL inicia e passa no `pg_isready`;
-3. o app inicia;
-4. `apps/web/scripts/start.mjs` aplica as migrations;
-5. o servidor Next.js começa a responder;
-6. `/api/health` consulta o banco e marca o container como saudável.
+1. valida as três variáveis obrigatórias;
+2. conecta ao PostgreSQL;
+3. executa as migrations;
+4. cria a extensão `vector`, caso ainda não exista;
+5. inicia o servidor Next.js.
 
 Nos logs do serviço `app`, procure por:
 
@@ -104,27 +84,24 @@ Nos logs do serviço `app`, procure por:
 [start] migrations ok
 ```
 
-No primeiro deploy, o app ainda não terá uma chave OpenAI. Ela será cadastrada pelo wizard depois que o domínio estiver funcionando.
+Se o banco ainda estiver reiniciando, o container do app sairá e será reiniciado automaticamente pela política `restart: unless-stopped`.
 
-## 5. Configure o domínio
+## 6. Configure o domínio
 
-Use o gerenciamento nativo de domínios do Dokploy:
+Na aba **Domains** do Compose:
 
-1. abra a aba **Domains** do serviço Compose;
-2. clique em **Add Domain**;
-3. selecione o serviço `app`;
-4. informe a porta interna `3000`;
-5. use `/` como path e internal path;
-6. configure seu domínio e HTTPS;
-7. salve e faça um novo deploy do Compose.
+1. clique em **Add Domain**;
+2. selecione o serviço `app`;
+3. use a porta interna `3000`;
+4. use `/` como path e internal path;
+5. configure domínio e HTTPS;
+6. salve e faça um novo deploy.
 
-Não associe um domínio ao serviço `database` e não publique a porta `5432`.
+Não associe um domínio ao banco e não publique a porta `5432`.
 
-O Compose usa `expose: 3000`, não `ports`. Assim, a aplicação é alcançada pelo proxy reverso do Dokploy sem abrir uma porta pública adicional no servidor.
+O uso do domínio pelo painel é o método recomendado na documentação oficial: [Docker Compose Domains](https://docs.dokploy.com/docs/core/docker-compose/domains).
 
-As instruções seguem o método recomendado na documentação oficial: [Docker Compose Domains](https://docs.dokploy.com/docs/core/docker-compose/domains).
-
-## 6. Conclua o setup
+## 7. Conclua o setup
 
 Acesse:
 
@@ -132,145 +109,109 @@ Acesse:
 https://seu-dominio.com/setup
 ```
 
-Preencha:
+Cadastre:
 
-1. nome, e-mail e senha do administrador;
+1. administrador inicial;
 2. chave da OpenAI;
 3. modelo padrão.
 
-Depois do setup, confirme:
+Depois, confirme:
 
-- login funcionando;
-- criação de conversa;
-- resposta da OpenAI;
-- criação de assistente;
-- upload e processamento de um PDF pequeno;
-- acesso a `https://seu-dominio.com/api/health`, que deve retornar `{"ok":true}`.
+- `/api/health` retorna `{"ok":true}`;
+- login funciona;
+- uma conversa recebe resposta;
+- um assistente pode ser criado;
+- um PDF pequeno pode ser enviado e processado.
 
-## Persistência dos dados
+## Dados persistentes e backups
 
-O Compose cria dois volumes nomeados:
+O banco é persistido e copiado pelo recurso de backups do banco no Dokploy. Configure um destino S3 e uma agenda de backup no painel.
 
-| Volume | Conteúdo | Consequência se for perdido |
-|---|---|---|
-| `postgres_data` | usuários, conversas, configurações, assistentes, chunks e embeddings | perda dos dados do sistema |
-| `app_data` | PDFs, planilhas e anexos enviados | documentos deixam de estar disponíveis |
-
-Um redeploy normal preserva esses volumes. Remover o Compose junto com seus volumes apaga os dados.
-
-### Backups
-
-Configure backups periódicos no Dokploy para os dois volumes. Para o banco, também é recomendado gerar dumps lógicos com `pg_dump`, pois eles são mais adequados para restauração e migração entre versões do PostgreSQL.
+O Compose mantém os documentos e anexos no volume nomeado `app_data`. Configure também **Volume Backups** para esse volume.
 
 Guarde fora do servidor:
 
-- backup do PostgreSQL;
-- backup do volume `app_data`;
-- cópia segura de `ENCRYPTION_KEY`;
-- versão/tag da aplicação usada pelo backup.
+- backup do banco;
+- backup de `app_data`;
+- `ENCRYPTION_KEY`;
+- versão/tag da aplicação.
 
-Faça pelo menos um teste real de restauração antes de depender desses backups.
+Teste uma restauração completa antes de depender dos backups.
 
 ## Atualizações
 
-Para atualizar:
-
-1. faça backup do banco e dos arquivos;
-2. revise novas migrations;
-3. atualize a branch ou tag configurada no Dokploy;
+1. faça backup do banco e de `app_data`;
+2. revise migrations novas;
+3. atualize a branch ou tag no Dokploy;
 4. faça o deploy;
-5. acompanhe os logs de migration;
-6. teste `/api/health`, login, chat e upload.
+5. acompanhe os logs;
+6. teste healthcheck, login, chat e upload.
 
-As migrations são aplicadas automaticamente. Não execute duas versões incompatíveis do app contra o mesmo banco durante uma atualização.
+## Erros comuns
 
-## Deploy local para conferência
+### `required variable DATABASE_URL is missing`
 
-O mesmo Compose pode ser testado em uma máquina com Docker:
+A variável não foi cadastrada ou salva na aba Environment do serviço Compose. Cole a Internal Connection URL do banco como `DATABASE_URL` e faça outro deploy.
 
-```bash
-cp dokploy.env.example .env
-```
+### `required variable AUTH_SECRET is missing`
 
-Edite `.env` com valores válidos e rode:
-
-```bash
-docker compose config
-docker compose up --build
-```
-
-Acesse `http://localhost:3000` somente se adicionar temporariamente uma publicação local de porta, por exemplo com um arquivo `docker-compose.override.yml` não versionado:
-
-```yaml
-services:
-  app:
-    ports:
-      - "3000:3000"
-```
-
-Não adicione essa publicação de porta ao Compose de produção.
-
-## Solução de problemas
-
-### `ENCRYPTION_KEY deve ter 64 caracteres`
-
-Gere novamente com:
+Gere e cadastre:
 
 ```bash
 openssl rand -hex 32
 ```
 
-Atualize a variável antes do primeiro setup. Se o sistema já estiver configurado, restaurar ou trocar a chave exige recadastrar a chave OpenAI.
+### `ENCRYPTION_KEY deve ter exatamente 64 caracteres`
 
-### O banco não fica saudável
+Gere novamente:
 
-Confira os logs de `database`. Verifique:
+```bash
+openssl rand -hex 32
+```
 
-- `POSTGRES_PASSWORD` definida;
-- espaço livre no servidor;
-- permissões e estado do volume;
-- se o volume veio de uma versão incompatível do PostgreSQL.
+Não troque a chave de uma instalação já configurada sem planejar a rotação da chave OpenAI.
 
-### O app mostra erro de pgvector
+### `extension "vector" is not available`
 
-Confirme que o serviço usa exatamente a imagem `pgvector/pgvector:pg17`. A migration inicial executa `CREATE EXTENSION IF NOT EXISTS vector`.
+O banco está usando uma imagem PostgreSQL sem pgvector. Configure uma imagem `pgvector/pgvector` compatível com a versão principal do banco e reinicie-o. Não faça troca de versão principal sem backup e processo de upgrade.
 
-### O app não encontra o banco
+### `getaddrinfo ENOTFOUND` para o host do banco
 
-Confirme que os serviços `app` e `database` continuam ligados à rede interna `backend`, que o app continua ligado à rede `frontend` e que o Dokploy adicionou sua rede de proxy ao serviço `app`. Use **Preview Compose** no Dokploy para conferir a configuração final.
+O app não está alcançando a rede interna do Dokploy. Confirme:
 
-### O domínio retorna 502
+- o hostname veio da Internal Connection URL;
+- app e banco estão no mesmo servidor/ambiente;
+- a rede externa `dokploy-network` existe;
+- o serviço `app` aparece nessa rede no **Preview Compose**.
 
-Confirme na aba Domains:
+### Domínio retorna 502
 
-- serviço: `app`;
+Confirme:
+
+- serviço do domínio: `app`;
 - container port: `3000`;
-- container do app saudável;
+- app saudável;
 - DNS apontando para o servidor;
-- Compose redeployado depois de alterar o domínio.
+- Compose redeployado após alterar o domínio.
 
-### O deploy fica preso na migration
+## Checklist
 
-Veja os logs dos dois serviços. O app só começa a servir depois que o banco fica saudável e todas as migrations terminam. Não interrompa uma migration sem antes verificar o estado do banco.
+- [ ] Banco criado no Dokploy.
+- [ ] Imagem do banco inclui pgvector.
+- [ ] Internal Connection URL copiada.
+- [ ] Compose Path é `./docker-compose.yml`.
+- [ ] `DATABASE_URL`, `AUTH_SECRET` e `ENCRYPTION_KEY` foram salvas.
+- [ ] Nenhum segredo foi enviado ao Git.
+- [ ] App está saudável.
+- [ ] Domínio aponta para `app:3000`.
+- [ ] Porta `5432` não está pública.
+- [ ] Setup foi concluído.
+- [ ] Backups do banco e de `app_data` estão configurados.
+- [ ] Uma restauração foi testada.
 
-## Checklist final
+Referências oficiais:
 
-- [ ] Serviço criado como Docker Compose.
-- [ ] Compose Path definido como `./docker-compose.yml`.
-- [ ] Segredos gerados e salvos fora do Git.
-- [ ] `ENCRYPTION_KEY` possui 64 caracteres hexadecimais.
-- [ ] Banco e app estão saudáveis.
-- [ ] Domínio aponta para o serviço `app` na porta `3000`.
-- [ ] Porta `5432` não está publicada.
-- [ ] HTTPS está ativo.
-- [ ] Setup inicial foi concluído.
-- [ ] Chat e upload foram testados.
-- [ ] Backups dos dois volumes estão configurados.
-- [ ] Uma restauração de backup foi testada.
-
-Referências oficiais do Dokploy:
-
+- [Conexão com bancos no Dokploy](https://docs.dokploy.com/docs/core/databases/connection)
+- [Bancos e backups](https://docs.dokploy.com/docs/core/databases)
 - [Docker Compose](https://docs.dokploy.com/docs/core/docker-compose)
 - [Domínios em Docker Compose](https://docs.dokploy.com/docs/core/docker-compose/domains)
-- [Variáveis de ambiente](https://docs.dokploy.com/docs/core/variables)
-- [Provedores Git](https://docs.dokploy.com/docs/core/providers)
