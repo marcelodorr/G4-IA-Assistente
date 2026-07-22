@@ -24,6 +24,7 @@ export function ConversationList({
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [saindo, setSaindo] = useState(false);
 
   const filtradas = conversations.filter((conv) =>
     (conv.title ?? "Nova conversa").toLowerCase().includes(busca.toLowerCase())
@@ -37,6 +38,19 @@ export function ConversationList({
     const eraAtiva = pathname === `/c/${id}`;
     router.refresh();
     if (eraAtiva) router.push("/");
+  }
+
+  async function sair() {
+    setSaindo(true);
+    try {
+      // O redirecionamento calculado pelo Auth.js pode usar o host interno
+      // quando a aplicação está atrás do proxy do Dokploy. Encerramos a
+      // sessão sem redirect e navegamos por uma URL relativa à origem atual.
+      await signOut({ redirect: false });
+      window.location.assign("/login");
+    } catch {
+      setSaindo(false);
+    }
   }
 
   return (
@@ -94,8 +108,8 @@ export function ConversationList({
             </Link>
           )}
         </div>
-        <Button variant="outline" size="sm" className="w-full" onClick={() => signOut()}>
-          Sair
+        <Button variant="outline" size="sm" className="w-full" disabled={saindo} onClick={() => void sair()}>
+          {saindo ? "Saindo…" : "Sair"}
         </Button>
       </div>
     </div>
