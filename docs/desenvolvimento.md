@@ -12,7 +12,8 @@ G4-IA-Assistente/
 │   └── web/          # aplicação Next.js (chat, admin, API, auth)
 ├── packages/
 │   └── cli/           # CLI publicada no npm como `g4-ia-assistente`
-├── Dockerfile          # build de produção (usado pelo deploy no Railway)
+├── Dockerfile          # build da imagem de produção
+├── docker-compose.yml  # app + PostgreSQL/pgvector para o Dokploy
 ├── railway.json        # config de deploy no Railway (build via Dockerfile + healthcheck)
 └── package.json         # raiz do workspace
 ```
@@ -22,7 +23,7 @@ G4-IA-Assistente/
 
 ## Setup local
 
-O ambiente de desenvolvimento **não usa Docker** — o Postgres de desenvolvimento roda em um projeto Railway próprio para dev, exposto via proxy TCP público (o Dockerfile e o Postgres com `pgvector` da imagem `pgvector/pgvector:pg17` são usados apenas no deploy de produção, veja [Build de produção](#build-de-produção)).
+O ambiente de desenvolvimento padrão **não usa Docker** — o Postgres de desenvolvimento roda em um projeto Railway próprio para dev, exposto via proxy TCP público. O Dockerfile e a imagem `pgvector/pgvector:pg17` são usados nos deploys de produção. O `docker-compose.yml` também pode ser usado para uma conferência local do ambiente do Dokploy; veja [implantacao-dokploy.md](implantacao-dokploy.md).
 
 1. **Node.js 22+** (veja `.nvmrc`) e npm.
 2. Instale as dependências do monorepo a partir da raiz:
@@ -79,11 +80,12 @@ Em produção, as migrations rodam automaticamente no boot do container (`apps/w
 
 ## Build de produção
 
-O deploy no Railway (tanto o do aluno via CLI quanto qualquer ambiente próprio) usa o `Dockerfile` da raiz:
+O deploy no Railway usa o `Dockerfile` da raiz. No Dokploy, o `docker-compose.yml` constrói exatamente esse mesmo Dockerfile e adiciona o serviço PostgreSQL/pgvector:
 
 - Build multi-stage: instala dependências do workspace `apps/web`, roda `next build` (modo standalone) e monta uma imagem final enxuta (`node:22-alpine`) contendo apenas o output standalone, os estáticos, os arquivos públicos e as migrations do Drizzle.
 - No boot, `apps/web/scripts/start.mjs` roda as migrations pendentes contra `DATABASE_URL` e só então inicia o servidor Next.js.
 - `railway.json` configura o build via Dockerfile e um healthcheck em `/api/health` (checa conexão com o banco).
+- `docker-compose.yml` configura healthchecks, rede privada do banco e volumes persistentes do app e do Postgres para o Dokploy.
 
 Para testar o build de produção localmente:
 

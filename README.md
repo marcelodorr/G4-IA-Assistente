@@ -21,6 +21,10 @@ Passo a passo completo — com pré-requisitos, o wizard de configuração e sol
 
 Este repositório é um monorepo (npm workspaces) com o app Next.js (`apps/web`) e a CLI de instalação (`packages/cli`). Setup local, testes, migrations do banco e publicação da CLI: **[docs/desenvolvimento.md](docs/desenvolvimento.md)**.
 
+## Deploy no Dokploy
+
+O repositório inclui um `docker-compose.yml` de produção com a aplicação, PostgreSQL/pgvector, healthchecks e volumes persistentes. Veja o passo a passo completo em **[docs/implantacao-dokploy.md](docs/implantacao-dokploy.md)**.
+
 ## Licença
 
 MIT.

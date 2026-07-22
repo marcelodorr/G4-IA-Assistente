@@ -1,0 +1,67 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no Dokploy}@database:5432/${POSTGRES_DB:-g4_assistente}
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no Dokploy}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Defina ENCRYPTION_KEY no Dokploy}
+      AUTH_TRUST_HOST: "true"
+      DATA_DIR: /data
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "3000"
+    volumes:
+      - app_data:/data
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    stop_grace_period: 30s
+
+  database:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no Dokploy}
+      POSTGRES_DB: ${POSTGRES_DB:-g4_assistente}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    stop_grace_period: 60s
+
+volumes:
+  app_data:
+  postgres_data:
+
+networks:
+  # Permite que o app acesse a OpenAI. O Dokploy acrescenta sua própria rede
+  # de proxy ao serviço app quando um domínio é configurado pelo painel.
+  frontend:
+  backend:
+    internal: true
