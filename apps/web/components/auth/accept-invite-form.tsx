@@ -24,7 +24,13 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
       setCarregando(false);
       return;
     }
-    await signIn("credentials", { email, password, redirectTo: "/" });
+    const login = await signIn("credentials", { email, password, redirect: false });
+    if (login?.error) {
+      setErro("Conta ativada, mas não foi possível entrar automaticamente. Acesse pela tela de login.");
+      setCarregando(false);
+      return;
+    }
+    window.location.replace("/");
   }
 
   return (

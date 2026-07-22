@@ -24,7 +24,21 @@ export function SetupWizard() {
       setEnviando(false);
       return;
     }
-    await signIn("credentials", { email: form.email, password: form.password, redirectTo: "/" });
+    const login = await signIn("credentials", {
+      email: form.email,
+      password: form.password,
+      redirect: false,
+    });
+
+    if (login?.error) {
+      setErro("Conta criada, mas não foi possível entrar automaticamente. Acesse pela tela de login.");
+      setEnviando(false);
+      return;
+    }
+
+    // Mantém o domínio e o protocolo públicos atuais, inclusive atrás do proxy
+    // do Dokploy, sem depender de uma URL absoluta calculada pelo Auth.js.
+    window.location.replace("/");
   }
 
   return (
