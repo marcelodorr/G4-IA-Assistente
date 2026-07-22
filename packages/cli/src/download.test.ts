@@ -9,10 +9,10 @@ describe("downloadCode", () => {
   it("baixa e extrai o tarball removendo a pasta raiz", async () => {
     // monta um tarball fixture: raiz/README.md
     const src = mkdtempSync(path.join(tmpdir(), "g4-src-"));
-    mkdirSync(path.join(src, "G4-IA-Assistente-main"));
-    writeFileSync(path.join(src, "G4-IA-Assistente-main", "README.md"), "# app");
+    mkdirSync(path.join(src, "Sequor-IA-Assistente-main"));
+    writeFileSync(path.join(src, "Sequor-IA-Assistente-main", "README.md"), "# app");
     const tarball = path.join(src, "repo.tgz");
-    await tar.c({ gzip: true, file: tarball, cwd: src }, ["G4-IA-Assistente-main"]);
+    await tar.c({ gzip: true, file: tarball, cwd: src }, ["Sequor-IA-Assistente-main"]);
 
     const dest = mkdtempSync(path.join(tmpdir(), "g4-dest-"));
     const fakeFetch = (async () => new Response(readFileSync(tarball))) as typeof fetch;

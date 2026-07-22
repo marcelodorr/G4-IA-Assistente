@@ -11,7 +11,7 @@ O app acessa o banco pela URL interna do Dokploy. O banco não precisa ter a por
 
 Crie um banco PostgreSQL no mesmo servidor/ambiente do app.
 
-O G4 IA Assistente exige a extensão pgvector. Antes do primeiro deploy do app, abra as configurações avançadas do banco e confirme que ele usa uma imagem pgvector compatível com a versão principal do PostgreSQL, por exemplo:
+O Sequor IA Assistente exige a extensão pgvector. Antes do primeiro deploy do app, abra as configurações avançadas do banco e confirme que ele usa uma imagem pgvector compatível com a versão principal do PostgreSQL, por exemplo:
 
 ```text
 pgvector/pgvector:pg17

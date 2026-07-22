@@ -12,7 +12,7 @@ export default async function AdminUsuariosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-medium">Usuários</h1>
-          <p className="text-sm text-muted-foreground">Gerencie os usuários com acesso ao G4 IA Assistente.</p>
+          <p className="text-sm text-muted-foreground">Gerencie os usuários com acesso ao Sequor IA Assistente.</p>
         </div>
         <InviteDialog />
       </div>

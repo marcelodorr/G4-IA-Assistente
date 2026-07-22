@@ -6,7 +6,7 @@ import { checkRailway, isLinkedProject } from "./steps.js";
 import { resolverModo, type Modo } from "./args.js";
 import { instalar, atualizar, obterUrl, abrirNavegador, appDir, type Ui } from "./fluxo.js";
 
-const dourado = (s: string) => pc.bold(pc.yellow(s));
+const sequor = (s: string) => pc.bold(pc.cyan(s));
 
 function mensagensRailway(motivo: "nao-instalada" | "nao-logada"): [string, string] {
   return motivo === "nao-instalada"
@@ -35,7 +35,7 @@ const uiPlana: Ui = {
   info: (msg) => console.log(msg),
 };
 
-const USAGE = `G4 IA Assistente — instalador CLI
+const USAGE = `Sequor IA Assistente — instalador CLI
 
 Uso:
   npx g4-ia-assistente [opções]
@@ -78,7 +78,7 @@ function resolverModoOuSair(): Modo {
 }
 
 async function rodarInterativo() {
-  intro(dourado("G4 IA Assistente — instalação no Railway"));
+  intro(sequor("Sequor IA Assistente — instalação no Railway"));
 
   const check = await checkRailway(run);
   if (!check.ok) {
@@ -98,7 +98,7 @@ async function rodarInterativo() {
       process.exit(0);
     }
     await atualizar(ui);
-    outro(dourado("Atualização concluída! ✦"));
+    outro(sequor("Atualização concluída! ✦"));
     return;
   }
 
@@ -114,10 +114,10 @@ async function rodarInterativo() {
 
   const url = await instalar(nome, ui);
 
-  log.success(`Seu assistente está em: ${dourado(url)}`);
+  log.success(`Seu assistente está em: ${sequor(url)}`);
   log.info("Abrindo o navegador para você concluir a configuração inicial...");
   await abrirNavegador(url);
-  outro(dourado("Instalação concluída! Finalize o setup no navegador. ✦"));
+  outro(sequor("Instalação concluída! Finalize o setup no navegador. ✦"));
 }
 
 async function rodarNaoInterativo(nome: string) {
@@ -166,6 +166,6 @@ async function main() {
 
 main().catch((e) => {
   log.error(e instanceof Error ? e.message : String(e));
-  log.info("Se o problema persistir, rode novamente ou fale com o suporte do G4.");
+  log.info("Se o problema persistir, rode novamente ou fale com o suporte da Sequor.");
   process.exit(1);
 });

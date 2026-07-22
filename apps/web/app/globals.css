@@ -50,24 +50,25 @@
 }
 
 :root {
-  --background: #06121d;          /* navy quase preto (fundo geral) */
-  --foreground: #F5F4F3;
-  --card: #0b1f30;                /* navy card, derivado de #001F35 */
-  --card-foreground: #F5F4F3;
-  --popover: #0b1f30;
-  --popover-foreground: #F5F4F3;
-  --primary: #B9915B;             /* dourado G4 */
-  --primary-foreground: #06121d;
-  --secondary: #0f1a45;
-  --secondary-foreground: #F5F4F3;
-  --muted: #12293c;
-  --muted-foreground: #9ca3af;
-  --accent: #12293c;
-  --accent-foreground: #F5F4F3;
-  --destructive: #af4332;
-  --border: rgba(245, 244, 243, 0.12);
-  --input: rgba(245, 244, 243, 0.16);
-  --ring: #B9915B;
+  /* Paleta Sequor: teal #20BBB6, preto #010103, grafite #2B2B39 e off-white #FAFAFA. */
+  --background: #010103;
+  --foreground: #FAFAFA;
+  --card: #111115;
+  --card-foreground: #FAFAFA;
+  --popover: #111115;
+  --popover-foreground: #FAFAFA;
+  --primary: #20BBB6;
+  --primary-foreground: #010103;
+  --secondary: #2B2B39;
+  --secondary-foreground: #FAFAFA;
+  --muted: #202027;
+  --muted-foreground: #A7A9AA;
+  --accent: #173638;
+  --accent-foreground: #FAFAFA;
+  --destructive: #D95757;
+  --border: rgba(250, 250, 250, 0.13);
+  --input: rgba(250, 250, 250, 0.18);
+  --ring: #20BBB6;
   --radius: 0.75rem;
 }
 
@@ -77,6 +78,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle at 85% -10%, rgba(32, 187, 182, 0.12), transparent 32rem);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;

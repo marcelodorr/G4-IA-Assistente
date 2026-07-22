@@ -7,8 +7,9 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
 const baskerville = Libre_Baskerville({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--font-serif" });
 
 export const metadata: Metadata = {
-  title: "G4 IA Assistente",
-  description: "Assistente de IA do G4 para o seu negócio",
+  title: "Sequor IA Assistente",
+  description: "Assistente de inteligência artificial da Sequor",
+  icons: { icon: "/brand/Sequor_Logo_Light.svg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

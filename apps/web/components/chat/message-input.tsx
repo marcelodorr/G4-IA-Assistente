@@ -97,7 +97,7 @@ export function MessageInput({
         </Button>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        O G4 IA Assistente pode cometer erros. Confira informações importantes.
+        O Sequor IA Assistente pode cometer erros. Confira informações importantes.
       </p>
     </div>
   );

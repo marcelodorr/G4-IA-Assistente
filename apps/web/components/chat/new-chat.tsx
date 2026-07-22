@@ -48,7 +48,7 @@ export function NewChat({
     <div className="flex h-full flex-col items-center justify-center gap-8 px-4">
       <div className="flex flex-col items-center gap-3 text-center">
         <Logo className="h-10 w-auto" />
-        <p className="font-serif text-lg italic text-muted-foreground">Para quem quer mais</p>
+        <p className="text-lg text-muted-foreground">Transformando dados em experiências que realmente importam.</p>
       </div>
       <div className="w-full max-w-xl space-y-3">
         <div className="flex gap-2">

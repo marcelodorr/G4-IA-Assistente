@@ -6,7 +6,7 @@ import { verifyCredentials } from "@/lib/auth/verify-credentials";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-const input = { name: "Admin", email: "Admin@G4.com", password: "senha123", openaiKey: "sk-ok", defaultModel: "gpt-5-mini" };
+const input = { name: "Admin", email: "Admin@Sequor.com.br", password: "senha123", openaiKey: "sk-ok", defaultModel: "gpt-5-mini" };
 const okKey = async () => true;
 
 describe.skipIf(!process.env.TEST_DATABASE_URL)("setup", () => {
@@ -20,10 +20,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("setup", () => {
     await completeSetup(db, input, { validateKey: okKey });
     expect(await isSetupCompleted(db)).toBe(true);
     expect(await getOpenAIKey(db)).toBe("sk-ok");
-    const [admin] = await db.select().from(users).where(eq(users.email, "admin@g4.com"));
+    const [admin] = await db.select().from(users).where(eq(users.email, "admin@sequor.com.br"));
     expect(admin.role).toBe("admin");
     // senha funciona no login
-    expect(await verifyCredentials("admin@g4.com", "senha123", async () => admin)).not.toBeNull();
+    expect(await verifyCredentials("admin@sequor.com.br", "senha123", async () => admin)).not.toBeNull();
   });
 
   it("recusa segunda execução", async () => {

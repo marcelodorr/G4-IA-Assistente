@@ -4,7 +4,7 @@ import { createConversation, listConversations, getConversation, replaceMessages
 import { users } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
-async function makeUser(db: Db, email = "u@g4.com") {
+async function makeUser(db: Db, email = "u@sequor.com.br") {
   const [u] = await db.insert(users).values({ name: "U", email, passwordHash: "x" }).returning();
   return u;
 }
@@ -27,8 +27,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("conversations", () => {
 
   it("não expõe conversa de outro usuário", async () => {
     const db = await getTestDb();
-    const dono = await makeUser(db, "dono@g4.com");
-    const outro = await makeUser(db, "outro@g4.com");
+    const dono = await makeUser(db, "dono@sequor.com.br");
+    const outro = await makeUser(db, "outro@sequor.com.br");
     const conv = await createConversation(db, { userId: dono.id });
     expect(await getConversation(db, conv.id, outro.id)).toBeNull();
     await deleteConversation(db, conv.id, outro.id); // não deleta

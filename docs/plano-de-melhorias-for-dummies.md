@@ -1,4 +1,4 @@
-# Plano de melhorias do G4 IA Assistente — guia “for dummies”
+# Plano de melhorias do Sequor IA Assistente — guia “for dummies”
 
 Este documento transforma a análise técnica do projeto em um plano de trabalho simples, dividido em fases.
 

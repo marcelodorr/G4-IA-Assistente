@@ -21,7 +21,7 @@ export async function obterUrl(ui: Ui): Promise<string> {
 }
 
 export async function instalar(nome: string, ui: Ui): Promise<string> {
-  ui.passo("Baixando o código do G4 IA Assistente");
+  ui.passo("Baixando o código do Sequor IA Assistente");
   await downloadCode(appDir);
   ui.ok("Código baixado");
 

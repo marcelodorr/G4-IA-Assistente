@@ -8,7 +8,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("assistants", () => {
   beforeEach(truncateAll);
 
   async function admin(db: Db) {
-    const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x", role: "admin" }).returning();
+    const [u] = await db.insert(users).values({ name: "A", email: "a@sequor.com.br", passwordHash: "x", role: "admin" }).returning();
     return u;
   }
 

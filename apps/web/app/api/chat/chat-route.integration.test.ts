@@ -71,7 +71,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("POST /api/chat (integração co
 
     const [user] = await db
       .insert(users)
-      .values({ name: "Usuária de Teste", email: "teste@g4.com", passwordHash: "hash-fake" })
+      .values({ name: "Usuária de Teste", email: "teste@sequor.com.br", passwordHash: "hash-fake" })
       .returning();
     authState.userId = user.id;
     authState.name = user.name;
@@ -87,7 +87,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("POST /api/chat (integração co
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: [
-          { id: "m1", role: "user", parts: [{ type: "text", text: "Olá, G4!" }] },
+          { id: "m1", role: "user", parts: [{ type: "text", text: "Olá, Sequor!" }] },
         ],
         conversationId: conversation.id,
       }),

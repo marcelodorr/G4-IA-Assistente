@@ -16,7 +16,7 @@ function Pre({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) {
       >
         Copiar
       </button>
-      <pre {...props} className="overflow-x-auto rounded-lg bg-[#04101a] p-4 text-sm">
+      <pre {...props} className="overflow-x-auto rounded-lg bg-[#2B2B39] p-4 text-sm">
         {children}
       </pre>
     </div>

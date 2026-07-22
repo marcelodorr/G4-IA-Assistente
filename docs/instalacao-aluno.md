@@ -1,24 +1,24 @@
-# Guia de instalação — G4 IA Assistente
+# Guia de instalação — Sequor IA Assistente
 
-Este guia mostra, passo a passo, como colocar o **G4 IA Assistente** no ar na sua própria conta Railway. Não é necessário saber programar — todo o processo é feito por um assistente de instalação que roda no seu terminal.
+Este guia mostra, passo a passo, como colocar o **Sequor IA Assistente** no ar na sua própria conta Railway. Não é necessário saber programar — todo o processo é feito por um assistente de instalação que roda no seu terminal.
 
 Tempo estimado: 10 a 15 minutos.
 
 ## O que você vai precisar
 
 1. Um computador (Windows ou Mac) com acesso à internet.
-2. Uma conta no [Railway](https://railway.app) — é a plataforma onde o seu G4 IA Assistente vai ficar hospedado.
+2. Uma conta no [Railway](https://railway.app) — é a plataforma onde o seu Sequor IA Assistente vai ficar hospedado.
 3. Uma conta na [OpenAI](https://platform.openai.com) — é ela quem fornece a inteligência artificial usada pelo chat. O uso é cobrado por consumo (veja o aviso sobre custos no passo 5).
 
 ## Passo 1 — Criar conta no Railway
 
 1. Acesse [railway.app](https://railway.app) e crie uma conta (pode entrar com o GitHub, Google ou e-mail).
 2. Confirme seu e-mail se for solicitado.
-3. O Railway pode pedir a confirmação de um cartão de crédito para liberar o uso de serviços fora do período gratuito de teste. O G4 IA Assistente roda em uma única aplicação + um banco de dados pequeno, então o custo mensal de hospedagem costuma ser baixo — consulte os planos atuais em [railway.app/pricing](https://railway.app/pricing).
+3. O Railway pode pedir a confirmação de um cartão de crédito para liberar o uso de serviços fora do período gratuito de teste. O Sequor IA Assistente roda em uma única aplicação + um banco de dados pequeno, então o custo mensal de hospedagem costuma ser baixo — consulte os planos atuais em [railway.app/pricing](https://railway.app/pricing).
 
 ## Passo 2 — Instalar o Node.js
 
-O Node.js é o programa que executa o instalador do G4 IA Assistente no seu computador.
+O Node.js é o programa que executa o instalador do Sequor IA Assistente no seu computador.
 
 1. Acesse [nodejs.org](https://nodejs.org) e baixe a versão **LTS** (recomendada), que já atende ao requisito mínimo (Node.js 20 ou superior).
    - **Windows**: baixe o instalador `.msi`, execute e siga o assistente (Next, Next, Finish).
@@ -53,7 +53,7 @@ npx g4-ia-assistente
 
 O instalador vai perguntar o nome do projeto e, em seguida, fazer tudo sozinho:
 
-1. Baixa o código mais recente do G4 IA Assistente.
+1. Baixa o código mais recente do Sequor IA Assistente.
 2. Cria um novo projeto na sua conta Railway.
 3. Provisiona um banco de dados Postgres com suporte a busca vetorial (necessário para a base de conhecimento) — usa a imagem `pgvector/pgvector`, já que o Postgres padrão do Railway não inclui essa extensão.
 4. Anexa um volume de armazenamento persistente ao banco, para os dados não se perderem entre deploys.
@@ -94,7 +94,7 @@ Ao concluir, você já entra logado como administrador.
 2. Preencha:
    - **Nome** (ex: "Vendas", "Suporte", "RH").
    - **Descrição** (opcional).
-   - **System prompt**: as instruções que definem como esse assistente deve se comportar (ex: "Você é um especialista em vendas do G4, responda de forma direta e objetiva...").
+   - **System prompt**: as instruções que definem como esse assistente deve se comportar (ex: "Você é um especialista em vendas da Sequor, responda de forma direta e objetiva...").
    - **Modelo**: use o padrão do sistema ou escolha um modelo específico para esse assistente.
 3. Clique em **Criar assistente**.
 4. Abra o assistente criado e envie os documentos da base de conhecimento (PDF ou Excel — `.pdf`, `.xlsx`, `.xls`). Os arquivos são automaticamente processados e transformados em uma base vetorial pesquisável.
@@ -104,7 +104,7 @@ Você pode criar quantos assistentes fizerem sentido para o seu negócio, cada u
 
 ## Como atualizar para uma versão mais nova
 
-Sempre que quiser atualizar o G4 IA Assistente instalado, rode o mesmo comando de novo, no mesmo computador em que fez a instalação original:
+Sempre que quiser atualizar o Sequor IA Assistente instalado, rode o mesmo comando de novo, no mesmo computador em que fez a instalação original:
 
 ```bash
 npx g4-ia-assistente
@@ -125,6 +125,6 @@ Isso só é seguro quando a instalação anterior terminou com sucesso (você ch
   (rode dentro da pasta `~/.g4-ia-assistente/app`, criada pelo instalador, ou de qualquer lugar depois de rodar `railway link` e selecionar o projeto).
 - **"Chave OpenAI inválida"** no wizard de configuração: confira se copiou a chave completa (começa com `sk-`) de [platform.openai.com/api-keys](https://platform.openai.com/api-keys) e se a conta OpenAI tem saldo/cartão configurado. Você pode tentar novamente direto na tela de configuração — nada é perdido.
 - **A aplicação não abre / fica com erro após o deploy**: o Railway verifica automaticamente a saúde do serviço em `/api/health`; se o deploy não ficar saudável, confira `railway logs --service app` para identificar o erro (é comum ser um problema temporário de conexão com o banco — aguarde alguns instantes e recarregue a página).
-- **Esqueci minha senha de administrador**: hoje não existe um fluxo de "esqueci minha senha" no produto; peça a outro administrador para te convidar novamente, ou entre em contato com o suporte do G4.
+- **Esqueci minha senha de administrador**: hoje não existe um fluxo de "esqueci minha senha" no produto; peça a outro administrador para te convidar novamente, ou entre em contato com o suporte da Sequor.
 - **A instalação falhou antes de terminar** (nunca chegou a mostrar o endereço público): o instalador não retoma automaticamente de onde parou — como um projeto já foi vinculado no seu computador, rodar `npx g4-ia-assistente` de novo tentaria apenas *atualizar* esse projeto incompleto, o que não corrige as partes que faltaram (banco, volumes, etc.). O caminho seguro é: apague o projeto incompleto no [painel do Railway](https://railway.app/dashboard) e rode `npx g4-ia-assistente` novamente do zero.
-- Se nenhuma dessas soluções resolver, entre em contato com o suporte do G4.
+- Se nenhuma dessas soluções resolver, entre em contato com o suporte da Sequor.

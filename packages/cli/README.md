@@ -1,6 +1,6 @@
 # g4-ia-assistente (CLI)
 
-Instala o **G4 IA Assistente** na sua própria conta Railway com um único comando.
+Instala o **Sequor IA Assistente** na sua própria conta Railway com um único comando.
 
 ## Pré-requisitos
 
@@ -22,7 +22,7 @@ Siga as instruções interativas. Ao final, o navegador abre automaticamente na 
 ## O que a CLI faz
 
 1. Verifica se a Railway CLI está instalada e logada.
-2. Baixa o código-fonte mais recente do G4 IA Assistente (tarball do GitHub).
+2. Baixa o código-fonte mais recente do Sequor IA Assistente (tarball do GitHub).
 3. Cria um novo projeto na sua conta Railway (`railway init`).
 4. Provisiona um banco Postgres com a extensão `pgvector` (imagem `pgvector/pgvector:pg17`, já que o template padrão de Postgres do Railway não inclui a extensão).
 5. Anexa um volume persistente ao serviço do banco (`/var/lib/postgresql/data`).
@@ -64,4 +64,4 @@ Isso só é seguro quando a instalação anterior terminou com sucesso. Se a pri
 - **Build ou deploy falhou no Railway**: veja os logs do serviço com `railway logs` (dentro da pasta `~/.g4-ia-assistente/app`, ou com `railway logs --service app` de qualquer lugar depois de linkar o projeto).
 - **Erro ao baixar o código**: verifique sua conexão com a internet e tente novamente.
 - **A instalação falhou antes de terminar**: apague o projeto incompleto no [painel do Railway](https://railway.app/dashboard) e rode `npx g4-ia-assistente` de novo — não tente apenas rodar o comando de novo por cima, veja o aviso acima.
-- Se o problema persistir, entre em contato com o suporte do G4.
+- Se o problema persistir, entre em contato com o suporte da Sequor.

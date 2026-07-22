@@ -1,13 +1,13 @@
-# Guia de desenvolvimento — G4 IA Assistente
+# Guia de desenvolvimento — Sequor IA Assistente
 
-Este guia é para quem vai trabalhar no código do G4 IA Assistente (o app web e/ou a CLI de instalação).
+Este guia é para quem vai trabalhar no código do Sequor IA Assistente (o app web e/ou a CLI de instalação).
 
 ## Estrutura do monorepo
 
 O projeto é um monorepo com **npm workspaces**:
 
 ```
-G4-IA-Assistente/
+Sequor-IA-Assistente/
 ├── apps/
 │   └── web/          # aplicação Next.js (chat, admin, API, auth)
 ├── packages/

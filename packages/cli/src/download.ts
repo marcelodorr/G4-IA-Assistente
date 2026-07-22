@@ -3,7 +3,8 @@ import { tmpdir } from "os";
 import path from "path";
 import * as tar from "tar";
 
-const TARBALL_URL = "https://codeload.github.com/GuilhermeMReis/G4-IA-Assistente/tar.gz/refs/heads/main";
+// O nome do repositório permanece legado por compatibilidade; a marca exibida pelo produto é Sequor.
+const TARBALL_URL = "https://codeload.github.com/marcelodorr/G4-IA-Assistente/tar.gz/refs/heads/main";
 
 export async function downloadCode(destDir: string, opts: { tarballUrl?: string; fetchImpl?: typeof fetch } = {}) {
   const fetchImpl = opts.fetchImpl ?? fetch;

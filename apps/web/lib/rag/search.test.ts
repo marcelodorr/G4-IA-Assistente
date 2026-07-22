@@ -12,7 +12,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("searchChunks", () => {
   beforeEach(truncateAll);
 
   async function seed(db: Db) {
-    const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x" }).returning();
+    const [u] = await db.insert(users).values({ name: "A", email: "a@sequor.com.br", passwordHash: "x" }).returning();
     const [a] = await db.insert(assistants).values({ name: "V", systemPrompt: "sp", createdBy: u.id }).returning();
     const [f] = await db.insert(assistantFiles).values({
       assistantId: a.id, filename: "doc.pdf", mime: "application/pdf", size: 1, storagePath: "x", status: "ready",
@@ -37,7 +37,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("searchChunks", () => {
   it("não vaza chunks de outro assistente", async () => {
     const db = await getTestDb();
     await seed(db);
-    const [u2] = await db.insert(users).values({ name: "B", email: "b@g4.com", passwordHash: "x" }).returning();
+    const [u2] = await db.insert(users).values({ name: "B", email: "b@sequor.com.br", passwordHash: "x" }).returning();
     const [outro] = await db.insert(assistants).values({ name: "O", systemPrompt: "sp", createdBy: u2.id }).returning();
     expect(await searchChunks(db, outro.id, vec(0))).toHaveLength(0);
   });

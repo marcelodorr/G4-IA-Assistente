@@ -14,7 +14,7 @@ export default async function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center space-y-4">
           <Logo />
-          <p className="font-serif italic text-muted-foreground">Para quem quer mais</p>
+          <p className="max-w-sm text-center text-sm text-muted-foreground">Transformando dados em experiências que realmente importam.</p>
         </CardHeader>
         <CardContent><LoginForm /></CardContent>
       </Card>

@@ -19,7 +19,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("ingestFile", () => {
   });
 
   async function seed(db: Db, storedName: string) {
-    const [u] = await db.insert(users).values({ name: "A", email: "a@g4.com", passwordHash: "x", role: "admin" }).returning();
+    const [u] = await db.insert(users).values({ name: "A", email: "a@sequor.com.br", passwordHash: "x", role: "admin" }).returning();
     const [a] = await db.insert(assistants).values({ name: "V", systemPrompt: "sp", createdBy: u.id }).returning();
     const [f] = await db.insert(assistantFiles).values({
       assistantId: a.id, filename: "exemplo.pdf", mime: "application/pdf",

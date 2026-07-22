@@ -1,8 +1,8 @@
-# G4 IA Assistente
+# Sequor IA Assistente
 
-**Para quem quer mais.**
+**Transformando dados em experiências que realmente importam.**
 
-O **G4 IA Assistente** é um chat de IA no estilo ChatGPT com a marca do G4, que você hospeda na sua própria conta Railway. Configure assistentes com prompts personalizados, alimente-os com uma base de conhecimento (PDFs e planilhas) e libere o acesso para a sua equipe — em poucos minutos, sem escrever uma linha de código.
+O **Sequor IA Assistente** é um chat de IA no estilo ChatGPT com a marca da Sequor, que você hospeda na sua própria conta Railway. Configure assistentes com prompts personalizados, alimente-os com uma base de conhecimento (PDFs e planilhas) e libere o acesso para a sua equipe — em poucos minutos, sem escrever uma linha de código.
 
 ## Instalação (alunos)
 

@@ -11,7 +11,7 @@ XLSX.set_fs(fs);
 const pdf = await PDFDocument.create();
 const page = pdf.addPage();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
-page.drawText("O faturamento do G4 em 2025 foi de 10 milhoes de reais.", { x: 50, y: 700, size: 14, font });
+page.drawText("O faturamento da Sequor em 2025 foi de 10 milhoes de reais.", { x: 50, y: 700, size: 14, font });
 writeFileSync(new URL("./exemplo.pdf", import.meta.url), await pdf.save());
 
 const wb = XLSX.utils.book_new();

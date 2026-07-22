@@ -8,7 +8,7 @@ const fixture = (n: string) => readFileSync(path.join(__dirname, "../../test/fix
 describe("extractTextFromFile", () => {
   it("extrai texto de PDF", async () => {
     const text = await extractTextFromFile(fixture("exemplo.pdf"), "application/pdf");
-    expect(text).toContain("faturamento do G4");
+    expect(text).toContain("faturamento da Sequor");
   });
 
   it("extrai todas as abas de Excel como CSV", async () => {
