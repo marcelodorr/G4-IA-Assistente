@@ -14,16 +14,17 @@ export function NewChat({
   models,
 }: {
   assistants: AssistantSummary[];
-  defaultModel: string;
+  defaultModel: string | null;
   models: string[];
 }) {
   const router = useRouter();
   const [assistantId, setAssistantId] = useState<string | null>(null);
-  const [model, setModel] = useState(defaultModel);
+  const [model, setModel] = useState(defaultModel ?? "");
   const [criando, setCriando] = useState(false);
 
   async function onSend(text: string, files: Attachment[]) {
     if (criando) return;
+    if (!model) return toast.error("Nenhum modelo de IA está liberado para seu usuário");
     setCriando(true);
     try {
       const res = await fetch("/api/conversations", {
@@ -53,11 +54,12 @@ export function NewChat({
         <p className="text-lg text-muted-foreground">Transformando dados em experiências que realmente importam.</p>
       </div>
       <div className="w-full max-w-xl space-y-3">
+        {models.length === 0 && <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-center text-sm text-destructive">Nenhum modelo está liberado para seu usuário. Solicite acesso ao administrador.</p>}
         <div className="flex flex-col gap-2 sm:flex-row">
           <AssistantPicker assistants={assistants} value={assistantId} onChange={setAssistantId} />
           <ModelPicker value={model} onChange={setModel} models={models} />
         </div>
-        <MessageInput onSend={onSend} disabled={criando} />
+        <MessageInput onSend={onSend} disabled={criando || models.length === 0} />
       </div>
     </div>
   );

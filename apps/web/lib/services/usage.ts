@@ -6,8 +6,10 @@ import type { Db, Tx } from "@/lib/db";
 function periodStarts(now = new Date()) {
   const day = new Date(now);
   day.setUTCHours(0, 0, 0, 0);
+  const week = new Date(day);
+  week.setUTCDate(week.getUTCDate() - ((week.getUTCDay() + 6) % 7));
   const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return { day, month };
+  return { day, week, month };
 }
 
 const chargedTokens = sql<number>`greatest(${aiUsage.inputTokens} + ${aiUsage.outputTokens}, ${aiUsage.reservedTokens})`;
@@ -37,19 +39,25 @@ export async function reserveChatUsage(db: Db, input: {
     const [config] = await tx.select().from(settings).where(eq(settings.id, 1));
     const [user] = await tx.select().from(users).where(eq(users.id, input.userId));
     if (!user) throw new Error("Usuário não encontrado");
-    const { day, month } = periodStarts();
+    const { day, week, month } = periodStarts();
     const reservation = input.estimatedInputTokens + input.maxOutputTokens;
     const dayAll = await sumUsage(tx, day);
+    const weekAll = await sumUsage(tx, week);
     const monthAll = await sumUsage(tx, month);
     const dayUser = await sumUsage(tx, day, input.userId);
+    const weekUser = await sumUsage(tx, week, input.userId);
     const monthUser = await sumUsage(tx, month, input.userId);
     const globalDaily = config?.dailyTokenLimit ?? 200_000;
+    const globalWeekly = config?.weeklyTokenLimit ?? 1_000_000;
     const globalMonthly = config?.monthlyTokenLimit ?? 4_000_000;
     const userDaily = user.dailyTokenLimit ?? globalDaily;
+    const userWeekly = user.weeklyTokenLimit ?? globalWeekly;
     const userMonthly = user.monthlyTokenLimit ?? globalMonthly;
     if (dayAll + reservation > globalDaily) throw Response.json({ error: "Cota diária da instalação atingida" }, { status: 429 });
+    if (weekAll + reservation > globalWeekly) throw Response.json({ error: "Cota semanal da instalação atingida" }, { status: 429 });
     if (monthAll + reservation > globalMonthly) throw Response.json({ error: "Cota mensal da instalação atingida" }, { status: 429 });
     if (dayUser + reservation > userDaily) throw Response.json({ error: "Sua cota diária de IA foi atingida" }, { status: 429 });
+    if (weekUser + reservation > userWeekly) throw Response.json({ error: "Sua cota semanal de IA foi atingida" }, { status: 429 });
     if (monthUser + reservation > userMonthly) throw Response.json({ error: "Sua cota mensal de IA foi atingida" }, { status: 429 });
 
     const [row] = await tx.insert(aiUsage).values({
@@ -129,7 +137,8 @@ export async function recordCompletedChatUsage(db: Db, input: {
 }
 
 export async function getUsageDashboard(db: Db) {
-  const { day, month } = periodStarts();
+  const { day, week, month } = periodStarts();
+  const userUsageSince = week.getTime() < month.getTime() ? week : month;
   const totals = await db.execute(sql`
     select
       coalesce(sum(input_tokens), 0)::int as "inputTokens",
@@ -142,10 +151,11 @@ export async function getUsageDashboard(db: Db) {
   const byUser = await db.execute(sql`
     select u.id, u.name, u.email,
       coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${day}), 0)::int as "todayTokens",
-      coalesce(sum(a.input_tokens + a.output_tokens), 0)::int as "monthTokens",
-      coalesce(sum(a.estimated_cost_micros), 0)::bigint as "costMicros",
-      u.daily_token_limit as "dailyTokenLimit", u.monthly_token_limit as "monthlyTokenLimit"
-    from users u left join ai_usage a on a.user_id = u.id and a.created_at >= ${month}
+      coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${week}), 0)::int as "weekTokens",
+      coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${month}), 0)::int as "monthTokens",
+      coalesce(sum(a.estimated_cost_micros) filter (where a.created_at >= ${month}), 0)::bigint as "costMicros",
+      u.daily_token_limit as "dailyTokenLimit", u.weekly_token_limit as "weeklyTokenLimit", u.monthly_token_limit as "monthlyTokenLimit"
+    from users u left join ai_usage a on a.user_id = u.id and a.created_at >= ${userUsageSince}
     group by u.id order by "monthTokens" desc
   `);
   const byConversation = await db.execute(sql`
@@ -182,9 +192,11 @@ export async function getUsageDashboard(db: Db) {
         name: String(row.name ?? ""),
         email: String(row.email ?? ""),
         todayTokens: numberValue(row.todayTokens),
+        weekTokens: numberValue(row.weekTokens),
         monthTokens: numberValue(row.monthTokens),
         costMicros: numberValue(row.costMicros),
         dailyTokenLimit: nullableNumber(row.dailyTokenLimit),
+        weeklyTokenLimit: nullableNumber(row.weeklyTokenLimit),
         monthlyTokenLimit: nullableNumber(row.monthlyTokenLimit),
       };
     }),

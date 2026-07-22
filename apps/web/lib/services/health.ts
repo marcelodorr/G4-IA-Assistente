@@ -1,7 +1,7 @@
 import { mkdir, statfs } from "fs/promises";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { assistantFiles, aiUsage } from "@/lib/db/schema";
+import { assistantFiles, aiUsage, globalContextFiles } from "@/lib/db/schema";
 import { uploadsDir } from "@/lib/files/storage";
 import { getOpenAIKey, getSettings } from "@/lib/services/settings";
 
@@ -85,8 +85,9 @@ export async function getAdminHealth() {
   let configured = { hasOpenAiKey: false, defaultModel: "desconhecido" };
   if (database.status === "ok") {
     try {
-      [jobs, usage, configured] = await Promise.all([
+      const [assistantJobs, globalJobs, usageRows, configuredSettings] = await Promise.all([
         db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status),
+        db.select({ status: globalContextFiles.status, total: sql<number>`count(*)::int` }).from(globalContextFiles).groupBy(globalContextFiles.status),
         db.select({
           calls: sql<number>`count(*)::int`,
           failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
@@ -94,6 +95,9 @@ export async function getAdminHealth() {
         }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`),
         getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })),
       ]);
+      jobs = [...assistantJobs, ...globalJobs];
+      usage = usageRows;
+      configured = configuredSettings;
     } catch (error) {
       console.error("[admin/saude] Falha ao consultar métricas do banco", error);
       database = {
@@ -103,7 +107,10 @@ export async function getAdminHealth() {
       };
     }
   }
-  const jobCounts = Object.fromEntries(jobs.map((row) => [row.status, Number(row.total)]));
+  const jobCounts = jobs.reduce<Record<string, number>>((counts, row) => {
+    counts[row.status] = (counts[row.status] ?? 0) + Number(row.total);
+    return counts;
+  }, {});
   return {
     checkedAt: new Date(), database, openai, storage, update,
     jobs: { pending: (jobCounts.pending ?? 0) + (jobCounts.processing ?? 0), errors: jobCounts.error ?? 0 },

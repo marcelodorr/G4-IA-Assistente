@@ -23,6 +23,7 @@ export async function getSettings(db: Db) {
     setupCompleted: row?.setupCompleted ?? false,
     hasKey: Boolean(row?.openaiKeyEncrypted),
     dailyTokenLimit: row?.dailyTokenLimit ?? 200_000,
+    weeklyTokenLimit: row?.weeklyTokenLimit ?? 1_000_000,
     monthlyTokenLimit: row?.monthlyTokenLimit ?? 4_000_000,
     maxOutputTokens: row?.maxOutputTokens ?? 2_048,
     disabledModels,
@@ -49,6 +50,7 @@ export async function setDefaultModel(db: Db | Tx, model: string) {
 export async function setAiControls(db: Db | Tx, input: {
   defaultModel: string;
   dailyTokenLimit: number;
+  weeklyTokenLimit: number;
   monthlyTokenLimit: number;
   maxOutputTokens: number;
   disabledModels: string[];
@@ -58,11 +60,14 @@ export async function setAiControls(db: Db | Tx, input: {
   if (disabledModels.some((model) => !isAllowedModel(model))) throw new Error("Modelo desabilitado inválido");
   if (!isModelEnabled(input.defaultModel, disabledModels)) throw new Error("O modelo padrão não pode estar desabilitado");
   if (!Number.isInteger(input.dailyTokenLimit) || input.dailyTokenLimit < 1_000) throw new Error("Limite diário inválido");
+  if (!Number.isInteger(input.weeklyTokenLimit) || input.weeklyTokenLimit < input.dailyTokenLimit) throw new Error("Limite semanal inválido");
   if (!Number.isInteger(input.monthlyTokenLimit) || input.monthlyTokenLimit < input.dailyTokenLimit) throw new Error("Limite mensal inválido");
+  if (input.monthlyTokenLimit < input.weeklyTokenLimit) throw new Error("O limite mensal deve ser maior ou igual ao semanal");
   if (!Number.isInteger(input.maxOutputTokens) || input.maxOutputTokens < 128 || input.maxOutputTokens > 16_384) throw new Error("Limite de resposta inválido");
   await upsert(db, {
     defaultModel: input.defaultModel,
     dailyTokenLimit: input.dailyTokenLimit,
+    weeklyTokenLimit: input.weeklyTokenLimit,
     monthlyTokenLimit: input.monthlyTokenLimit,
     maxOutputTokens: input.maxOutputTokens,
     disabledModels,

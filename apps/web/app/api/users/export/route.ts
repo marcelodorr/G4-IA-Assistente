@@ -11,9 +11,10 @@ function csvCell(value: unknown) {
 export const GET = apiHandler(async () => {
   await requireAdmin();
   const rows = await listUsers(db);
-  const header = ["Nome", "E-mail", "Papel", "Status", "Último acesso", "Criado em"];
+  const header = ["Nome", "E-mail", "Papel", "Status", "Cota diária", "Cota semanal", "Cota mensal", "Modelos", "Acesso a assistentes", "Último acesso", "Criado em"];
   const lines = rows.map((user) => [
-    user.name, user.email, user.role, user.active ? "Ativo" : "Inativo",
+    user.name, user.email, user.role, user.active ? "Ativo" : "Inativo", user.dailyTokenLimit, user.weeklyTokenLimit, user.monthlyTokenLimit,
+    user.allowedModels?.join("; ") ?? "Todos os habilitados", user.assistantAccessMode === "all" ? "Todos" : `${user.assistantIds.length} selecionado(s)`,
     user.lastLoginAt?.toISOString() ?? "", user.createdAt.toISOString(),
   ]);
   const csv = `\uFEFF${[header, ...lines].map((row) => row.map(csvCell).join(",")).join("\r\n")}`;

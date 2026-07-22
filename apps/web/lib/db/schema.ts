@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, uuid, vector, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, jsonb, uuid, vector, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -8,7 +8,10 @@ export const users = pgTable("users", {
   role: text("role", { enum: ["admin", "member"] }).notNull().default("member"),
   active: boolean("active").notNull().default(true),
   dailyTokenLimit: integer("daily_token_limit"),
+  weeklyTokenLimit: integer("weekly_token_limit"),
   monthlyTokenLimit: integer("monthly_token_limit"),
+  allowedModels: jsonb("allowed_models"),
+  assistantAccessMode: text("assistant_access_mode", { enum: ["all", "selected"] }).notNull().default("all"),
   sessionVersion: integer("session_version").notNull().default(1),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -32,9 +35,11 @@ export const settings = pgTable("settings", {
   defaultModel: text("default_model").notNull().default("gpt-5-mini"),
   setupCompleted: boolean("setup_completed").notNull().default(false),
   dailyTokenLimit: integer("daily_token_limit").notNull().default(200000),
+  weeklyTokenLimit: integer("weekly_token_limit").notNull().default(1000000),
   monthlyTokenLimit: integer("monthly_token_limit").notNull().default(4000000),
   maxOutputTokens: integer("max_output_tokens").notNull().default(2048),
   disabledModels: jsonb("disabled_models").notNull().default([]),
+  globalContext: text("global_context").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -48,6 +53,15 @@ export const assistants = pgTable("assistants", {
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const userAssistantAccess = pgTable("user_assistant_access", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assistantId: uuid("assistant_id").notNull().references(() => assistants.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.assistantId] }),
+  index("user_assistant_access_user_idx").on(t.userId),
+]);
 
 export const assistantFiles = pgTable("assistant_files", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -71,6 +85,29 @@ export const chunks = pgTable("chunks", {
 }, (t) => [
   index("chunks_assistant_idx").on(t.assistantId),
   index("chunks_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+]);
+
+export const globalContextFiles = pgTable("global_context_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  filename: text("filename").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
+  error: text("error"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const globalContextChunks = pgTable("global_context_chunks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileId: uuid("file_id").notNull().references(() => globalContextFiles.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+}, (t) => [
+  index("global_context_chunks_file_idx").on(t.fileId),
+  index("global_context_chunks_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
 ]);
 
 export const conversations = pgTable("conversations", {

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { embedMany } from "ai";
-import { assistantFiles, assistants, chunks } from "@/lib/db/schema";
+import { assistantFiles, assistants, chunks, globalContextChunks, globalContextFiles } from "@/lib/db/schema";
 import { readUpload } from "@/lib/files/storage";
 import { extractTextFromFile } from "./extract";
 import { chunkText } from "./chunking";
@@ -60,5 +60,55 @@ export function startIngestion(db: Db, fileId: string) {
   };
   void ingestFile(db, fileId, { embed: realEmbed }).catch((e) => {
     console.error(`[ingestão] falha no arquivo ${fileId}:`, e);
+  });
+}
+
+export async function ingestGlobalContextFile(db: Db, fileId: string, deps: Deps) {
+  const [file] = await db.select().from(globalContextFiles).where(eq(globalContextFiles.id, fileId));
+  if (!file) throw new Error("Arquivo não encontrado");
+  await db.update(globalContextFiles).set({ status: "processing", error: null }).where(eq(globalContextFiles.id, fileId));
+  try {
+    const { buf } = await readUpload(file.storagePath);
+    const text = await extractTextFromFile(buf, file.mime);
+    const parts = chunkText(text);
+    if (parts.length === 0) throw new Error("Nenhum texto extraído do arquivo");
+    await db.delete(globalContextChunks).where(eq(globalContextChunks.fileId, fileId));
+    for (let i = 0; i < parts.length; i += 100) {
+      const batch = parts.slice(i, i + 100);
+      const embeddings = await deps.embed(batch);
+      await db.insert(globalContextChunks).values(batch.map((content, index) => ({
+        fileId,
+        content,
+        chunkIndex: i + index,
+        embedding: embeddings[index],
+      })));
+    }
+    await db.update(globalContextFiles).set({ status: "ready" }).where(eq(globalContextFiles.id, fileId));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await db.update(globalContextFiles).set({ status: "error", error: message }).where(eq(globalContextFiles.id, fileId));
+  }
+}
+
+export function startGlobalContextIngestion(db: Db, fileId: string) {
+  const realEmbed = async (texts: string[]) => {
+    const openai = await getProvider(db);
+    const startedAt = Date.now();
+    const [file] = await db.select({ userId: globalContextFiles.createdBy }).from(globalContextFiles)
+      .where(eq(globalContextFiles.id, fileId));
+    try {
+      const { embeddings, usage } = await embedMany({
+        model: openai.textEmbeddingModel("text-embedding-3-small"),
+        values: texts,
+      });
+      if (file?.userId) await recordEmbeddingUsage(db, { userId: file.userId, tokens: usage.tokens, durationMs: Date.now() - startedAt, success: true });
+      return embeddings;
+    } catch (error) {
+      if (file?.userId) await recordEmbeddingUsage(db, { userId: file.userId, tokens: 0, durationMs: Date.now() - startedAt, success: false });
+      throw error;
+    }
+  };
+  void ingestGlobalContextFile(db, fileId, { embed: realEmbed }).catch((error) => {
+    console.error(`[contexto-global] falha no arquivo ${fileId}:`, error);
   });
 }

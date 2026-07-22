@@ -21,7 +21,11 @@ describe("extractTextFromFile", () => {
     expect(text).toContain("Imersao,5000000");
   });
 
+  it("extrai arquivos de texto usados por documentos e skills", async () => {
+    await expect(extractTextFromFile(Buffer.from("regra corporativa"), "text/markdown")).resolves.toBe("regra corporativa");
+  });
+
   it("lança para mime desconhecido", async () => {
-    await expect(extractTextFromFile(Buffer.from("x"), "text/plain")).rejects.toThrow(/não suportado/i);
+    await expect(extractTextFromFile(Buffer.from("x"), "application/octet-stream")).rejects.toThrow(/não suportado/i);
   });
 });

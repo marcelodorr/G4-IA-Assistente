@@ -1,20 +1,20 @@
 import { embed, tool } from "ai";
 import { z } from "zod";
-import { searchChunks } from "@/lib/rag/search";
+import { searchKnowledge } from "@/lib/rag/search";
 import type { Db } from "@/lib/db";
 import type { createOpenAI } from "@ai-sdk/openai";
 
 export function makeKnowledgeTool(
   db: Db,
   openai: ReturnType<typeof createOpenAI>,
-  assistantId: string,
+  assistantId: string | null,
   options?: {
     onEmbeddingUsage?: (usage: { tokens: number; durationMs: number; success: boolean }) => Promise<void>;
     beforeCall?: () => void;
   },
 ) {
   return tool({
-    description: "Busca trechos relevantes na base de conhecimento deste assistente (documentos enviados pelo administrador). Use sempre que a pergunta puder ser respondida por esses documentos.",
+    description: "Busca trechos relevantes no contexto corporativo geral e na base deste assistente. Use sempre que a pergunta puder depender de políticas, processos, dados ou documentos da empresa.",
     inputSchema: z.object({
       consulta: z.string().describe("Pergunta ou termos de busca em português"),
     }),
@@ -33,7 +33,7 @@ export function makeKnowledgeTool(
         await options?.onEmbeddingUsage?.({ tokens: 0, durationMs: Date.now() - startedAt, success: false });
         throw error;
       }
-      const resultados = await searchChunks(db, assistantId, embedding);
+      const resultados = await searchKnowledge(db, assistantId, embedding);
       if (resultados.length === 0) return "Nenhum trecho relevante encontrado na base de conhecimento.";
       return resultados.map((r, i) =>
         `[${i + 1}] Fonte: ${r.filename}\n<documento_nao_confiavel>\n${r.content}\n</documento_nao_confiavel>`,

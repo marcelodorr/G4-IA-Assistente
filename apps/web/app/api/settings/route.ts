@@ -11,14 +11,14 @@ export const GET = apiHandler(async () => {
 
 export const PATCH = apiHandler(async (req) => {
   await requireAdmin();
-  const { openaiKey, defaultModel, dailyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels } = await req.json();
+  const { openaiKey, defaultModel, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels } = await req.json();
   if (openaiKey) {
     const key = openaiKey.trim();
     if (!(await validateOpenAIKey(key))) return Response.json({ error: "Chave OpenAI inválida" }, { status: 400 });
     await saveOpenAIKey(db, key);
   }
   if (defaultModel) {
-    await setAiControls(db, { defaultModel, dailyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels });
+    await setAiControls(db, { defaultModel, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels });
   }
   return new Response(null, { status: 204 });
 });

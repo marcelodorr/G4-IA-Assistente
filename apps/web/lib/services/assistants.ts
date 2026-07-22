@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { assistants } from "@/lib/db/schema";
 import { isAllowedModel } from "@/lib/ai/models";
+import { getUserAccess } from "@/lib/services/users";
 import type { Db } from "@/lib/db";
 
 type CreateInput = { name: string; systemPrompt: string; description?: string; model?: string | null; createdBy: string };
@@ -30,6 +31,21 @@ export async function listAssistants(db: Db, opts: { onlyActive?: boolean }) {
 
 export async function getAssistant(db: Db, id: string) {
   return (await db.select().from(assistants).where(eq(assistants.id, id)))[0] ?? null;
+}
+
+export async function listAssistantsForUser(db: Db, userId: string) {
+  const access = await getUserAccess(db, userId);
+  if (access.assistantAccessMode === "all") return listAssistants(db, { onlyActive: true });
+  if (access.assistantIds.length === 0) return [];
+  return db.select().from(assistants).where(and(
+    eq(assistants.active, true),
+    inArray(assistants.id, access.assistantIds),
+  ));
+}
+
+export async function canUserAccessAssistant(db: Db, userId: string, assistantId: string) {
+  const rows = await listAssistantsForUser(db, userId);
+  return rows.some((assistant) => assistant.id === assistantId);
 }
 
 export async function deleteAssistant(db: Db, id: string) {

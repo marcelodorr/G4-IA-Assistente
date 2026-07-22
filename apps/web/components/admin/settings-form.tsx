@@ -15,6 +15,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
   const [openaiKey, setOpenaiKey] = useState("");
   const [modelo, setModelo] = useState(settings.defaultModel);
   const [dailyTokenLimit, setDailyTokenLimit] = useState(settings.dailyTokenLimit);
+  const [weeklyTokenLimit, setWeeklyTokenLimit] = useState(settings.weeklyTokenLimit);
   const [monthlyTokenLimit, setMonthlyTokenLimit] = useState(settings.monthlyTokenLimit);
   const [maxOutputTokens, setMaxOutputTokens] = useState(settings.maxOutputTokens);
   const [disabledModels, setDisabledModels] = useState(settings.disabledModels);
@@ -28,7 +29,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     setSalvando(true);
     const res = await fetch("/api/settings", {
       method: "PATCH",
-      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels }),
+      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels }),
     });
     setSalvando(false);
     if (!res.ok) {
@@ -67,9 +68,10 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
           <CardTitle>Limites de consumo</CardTitle>
           <CardDescription>As cotas contabilizam tokens de entrada e saída e bloqueiam novas chamadas antes do excesso.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2"><Label>Tokens por dia</Label><Input type="number" min={1000} value={dailyTokenLimit} onChange={(e) => setDailyTokenLimit(Number(e.target.value))} /></div>
-          <div className="space-y-2"><Label>Tokens por mês</Label><Input type="number" min={dailyTokenLimit} value={monthlyTokenLimit} onChange={(e) => setMonthlyTokenLimit(Number(e.target.value))} /></div>
+          <div className="space-y-2"><Label>Tokens por semana</Label><Input type="number" min={dailyTokenLimit} value={weeklyTokenLimit} onChange={(e) => setWeeklyTokenLimit(Number(e.target.value))} /></div>
+          <div className="space-y-2"><Label>Tokens por mês</Label><Input type="number" min={weeklyTokenLimit} value={monthlyTokenLimit} onChange={(e) => setMonthlyTokenLimit(Number(e.target.value))} /></div>
           <div className="space-y-2"><Label>Máximo por resposta</Label><Input type="number" min={128} max={16384} value={maxOutputTokens} onChange={(e) => setMaxOutputTokens(Number(e.target.value))} /></div>
         </CardContent>
       </Card>

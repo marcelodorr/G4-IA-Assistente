@@ -62,3 +62,32 @@ O lint `core-web-vitals` funciona como verificação automatizada básica. Antes
 ## Deploy
 
 A migration `0002_clever_emma_frost.sql` adiciona revogação de convites, criador do convite, último login e versão de sessão. Ela é aplicada automaticamente pelo script de inicialização.
+
+## Fase 9 — governança individual e contexto corporativo
+
+### O que o administrador controla
+
+Em **Administração → Usuários → Acessos e limites**, cada conta pode receber:
+
+- cota diária, semanal e mensal própria; campo vazio herda a cota geral;
+- todos os modelos habilitados ou apenas uma seleção individual;
+- todos os assistentes ativos ou apenas assistentes selecionados.
+
+Essas regras não são apenas visuais. As APIs de criação de conversa e de chat verificam novamente o usuário, o modelo e o assistente. Revogar um acesso impede novas mensagens mesmo em uma conversa antiga.
+
+### Contexto geral
+
+Em **Administração → Contexto geral**, cadastre as diretrizes permanentes da empresa e envie PDF, Excel, TXT, Markdown (inclusive `SKILL.md`), CSV, JSON ou YAML. O texto geral entra diretamente no prompt de sistema; os arquivos são divididos, vetorizados e consultados por relevância junto à base específica do assistente.
+
+A ordem aplicada a toda resposta é:
+
+1. regras de segurança da aplicação;
+2. contexto e diretrizes gerais da empresa;
+3. instruções específicas do assistente;
+4. conhecimento recuperado dos arquivos globais e do assistente.
+
+Para futuras integrações, reutilize `getGlobalContext`, `composeSystemPrompt`, `hasReadyKnowledge` e `makeKnowledgeTool`. Assim o novo canal mantém o mesmo contrato de contexto e segurança do chat.
+
+### Deploy
+
+A migration `0003_loud_sphinx.sql` cria as permissões por usuário, a cota semanal e a base documental global. O script de inicialização do container aplica a migration automaticamente antes de iniciar o Next.js.

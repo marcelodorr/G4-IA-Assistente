@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { saveUpload, readUpload, CHAT_MIMES, MAX_UPLOAD_BYTES } from "./storage";
+import { saveUpload, readUpload, CHAT_MIMES, KB_MIMES, MAX_UPLOAD_BYTES } from "./storage";
 
 describe("storage", () => {
   beforeEach(() => {
@@ -20,6 +20,11 @@ describe("storage", () => {
   it("rejeita mime não permitido", async () => {
     await expect(saveUpload(Buffer.from("x"), "a.exe", "application/x-msdownload", CHAT_MIMES))
       .rejects.toThrow(/não permitido/i);
+  });
+
+  it("reconhece Markdown pela extensão quando o navegador omite o MIME", async () => {
+    const saved = await saveUpload(Buffer.from("# Skill"), "SKILL.md", "", KB_MIMES);
+    expect(saved.mime).toBe("text/markdown");
   });
 
   it("rejeita arquivo acima do limite", async () => {

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { createAssistant, listAssistants } from "@/lib/services/assistants";
+import { createAssistant, listAssistants, listAssistantsForUser } from "@/lib/services/assistants";
 import { apiHandler, requireAdmin, requireSession } from "@/lib/services/guards";
 import { getSettings } from "@/lib/services/settings";
 import { isModelEnabled } from "@/lib/ai/models";
@@ -7,8 +7,10 @@ import { isModelEnabled } from "@/lib/ai/models";
 export const GET = apiHandler(async (req) => {
   const session = await requireSession();
   const onlyActive = new URL(req.url).searchParams.get("active") === "1";
-  const rows = await listAssistants(db, { onlyActive });
-  if (session.user.role !== "admin") {
+  const rows = session.user.role === "admin" && !onlyActive
+    ? await listAssistants(db, {})
+    : await listAssistantsForUser(db, session.user.id);
+  if (session.user.role !== "admin" || onlyActive) {
     // Membros não podem ver o systemPrompt dos assistentes (só admins editam/usam a página admin).
     return Response.json(
       rows.map(({ id, name, description, model, active, createdAt }) => ({ id, name, description, model, active, createdAt }))

@@ -24,9 +24,9 @@ export const POST = apiHandler(async (req, { params }) => {
   const file = form.get("file") as File | null;
   if (!file) return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
   const buf = Buffer.from(await file.arrayBuffer());
-  const { storedName } = await saveUpload(buf, file.name, file.type, KB_MIMES);
+  const { storedName, mime } = await saveUpload(buf, file.name, file.type, KB_MIMES);
   const [row] = await db.insert(assistantFiles).values({
-    assistantId: id, filename: file.name, mime: file.type, size: buf.byteLength, storagePath: storedName,
+    assistantId: id, filename: file.name, mime, size: buf.byteLength, storagePath: storedName,
   }).returning();
   startIngestion(db, row.id);
   return Response.json(row, { status: 202 });
