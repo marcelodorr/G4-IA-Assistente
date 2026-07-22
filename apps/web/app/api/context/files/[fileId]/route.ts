@@ -27,7 +27,7 @@ export const DELETE = apiHandler(async (_req, { params }) => {
   const [row] = await db.select().from(globalContextFiles).where(eq(globalContextFiles.id, fileId));
   if (row) {
     await db.delete(globalContextFiles).where(eq(globalContextFiles.id, fileId));
-    await unlink(path.join(uploadsDir(), row.storagePath)).catch(() => {});
+    if (row.sourceType === "admin") await unlink(path.join(uploadsDir(), row.storagePath)).catch(() => {});
   }
   return new Response(null, { status: 204 });
 });

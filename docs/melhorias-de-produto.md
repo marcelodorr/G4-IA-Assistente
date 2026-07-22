@@ -91,3 +91,36 @@ Para futuras integrações, reutilize `getGlobalContext`, `composeSystemPrompt`,
 ### Deploy
 
 A migration `0003_loud_sphinx.sql` cria as permissões por usuário, a cota semanal e a base documental global. O script de inicialização do container aplica a migration automaticamente antes de iniciar o Next.js.
+
+## Fase 10 — memória corporativa e agentes de produção
+
+### Memória que cresce com o uso
+
+Com **Aprendizado corporativo automático** habilitado em **Administração → Contexto geral**:
+
+- PDF, Excel, texto, Markdown, CSV, JSON e YAML anexados no chat entram automaticamente na base geral;
+- mensagens escritas pelos usuários viram memórias vetorizadas;
+- cada item mantém autor, conversa, data, situação do processamento e erro;
+- somente administradores visualizam ou removem o conteúdo bruto;
+- os usuários consultam o conhecimento apenas por meio das respostas protegidas pelo prompt de segurança;
+- **Importar histórico** processa anexos e mensagens anteriores em lotes controlados.
+
+Não são aprendidas respostas geradas pela própria IA, evitando transformar alucinações do modelo em conhecimento corporativo. Documentos e mensagens recuperados continuam marcados como dados não confiáveis para proteção contra prompt injection.
+
+### Tipos de agente
+
+Ao criar ou editar um assistente, o administrador escolhe uma capacidade:
+
+- **Chat e conhecimento:** comportamento tradicional com RAG;
+- **Gerador de imagens:** gera PNG usando `gpt-image-2`;
+- **Gerador de orçamentos:** gera XLSX, DOCX ou PDF;
+- **Gerador de apresentações:** gera PPTX ou PDF;
+- **Gerador de documentos:** gera DOCX ou PDF.
+
+Arquivos Office podem ser abertos ou importados no Google Planilhas, Google Docs e Google Slides. A criação direta dentro de uma conta Google exige uma futura integração OAuth com credenciais da organização; os formatos atuais não dependem dessa credencial e permanecem armazenados no volume privado do Dokploy.
+
+Cada artefato pertence ao usuário e à conversa que o gerou. Somente o proprietário e administradores conseguem baixá-lo. Usuários com acesso a assistentes selecionados precisam receber explicitamente o novo agente.
+
+### Deploy
+
+A migration `0004_mean_grey_gargoyle.sql` adiciona tipos de agente, memória auditável, rastreabilidade de anexos e artefatos gerados. O volume configurado em `DATA_DIR` passa a guardar as pastas `uploads` e `artifacts`; mantenha o volume persistente no Dokploy.

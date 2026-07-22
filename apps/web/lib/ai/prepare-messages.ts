@@ -1,6 +1,8 @@
 import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai";
 import { readUpload } from "@/lib/files/storage";
 import { extractText, getDocumentProxy } from "unpdf";
+import { extractTextFromFile } from "@/lib/rag/extract";
+import { KB_MIMES } from "@/lib/files/storage";
 
 const MAX_PDF_CHARS = 60_000; // ~15k tokens; acima disso trunca com aviso
 
@@ -34,8 +36,8 @@ export async function prepareModelMessages(
       const storedName = part.url.slice("/api/files/".length);
       if (options.authorizeFile && !(await options.authorizeFile(storedName))) throw new Error("Anexo não encontrado ou sem permissão");
       const { buf, mime } = await deps.readFile(storedName);
-      if (mime === "application/pdf") {
-        let text = await deps.extractPdfText(buf);
+      if (KB_MIMES.includes(mime)) {
+        let text = mime === "application/pdf" ? await deps.extractPdfText(buf) : await extractTextFromFile(buf, mime);
         if (text.length > MAX_PDF_CHARS) {
           text = text.slice(0, MAX_PDF_CHARS) + "\n[Documento truncado por tamanho]";
         }

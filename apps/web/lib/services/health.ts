@@ -1,7 +1,7 @@
 import { mkdir, statfs } from "fs/promises";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { assistantFiles, aiUsage, globalContextFiles } from "@/lib/db/schema";
+import { assistantFiles, aiUsage, corporateMemories, globalContextFiles } from "@/lib/db/schema";
 import { uploadsDir } from "@/lib/files/storage";
 import { getOpenAIKey, getSettings } from "@/lib/services/settings";
 
@@ -85,9 +85,10 @@ export async function getAdminHealth() {
   let configured = { hasOpenAiKey: false, defaultModel: "desconhecido" };
   if (database.status === "ok") {
     try {
-      const [assistantJobs, globalJobs, usageRows, configuredSettings] = await Promise.all([
+      const [assistantJobs, globalJobs, memoryJobs, usageRows, configuredSettings] = await Promise.all([
         db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status),
         db.select({ status: globalContextFiles.status, total: sql<number>`count(*)::int` }).from(globalContextFiles).groupBy(globalContextFiles.status),
+        db.select({ status: corporateMemories.status, total: sql<number>`count(*)::int` }).from(corporateMemories).groupBy(corporateMemories.status),
         db.select({
           calls: sql<number>`count(*)::int`,
           failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
@@ -95,7 +96,7 @@ export async function getAdminHealth() {
         }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`),
         getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })),
       ]);
-      jobs = [...assistantJobs, ...globalJobs];
+      jobs = [...assistantJobs, ...globalJobs, ...memoryJobs];
       usage = usageRows;
       configured = configuredSettings;
     } catch (error) {

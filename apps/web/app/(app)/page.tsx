@@ -16,7 +16,7 @@ export default async function NewChatPage() {
     getUserAccess(db, session.user.id),
   ]);
   // Só os campos necessários para o seletor chegam ao client — nunca o systemPrompt.
-  const assistants = assistentes.map(({ id, name, description }) => ({ id, name, description }));
+  const assistants = assistentes.map(({ id, name, description, agentType }) => ({ id, name, description, agentType }));
   const globallyEnabled = SUPPORTED_MODELS.filter((model) => !settings.disabledModels.includes(model));
   const models = filterUserModels(globallyEnabled, access.allowedModels);
   const defaultModel = models.includes(settings.defaultModel) ? settings.defaultModel : models[0] ?? null;

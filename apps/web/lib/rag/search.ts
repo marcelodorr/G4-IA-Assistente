@@ -1,5 +1,5 @@
 import { and, cosineDistance, desc, eq, gt, sql } from "drizzle-orm";
-import { assistantFiles, chunks, globalContextChunks, globalContextFiles } from "@/lib/db/schema";
+import { assistantFiles, chunks, corporateMemories, globalContextChunks, globalContextFiles } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
 export async function searchChunks(db: Db, assistantId: string, embedding: number[], opts: { k?: number; minSimilarity?: number } = {}) {
@@ -42,20 +42,30 @@ export async function searchGlobalContextChunks(db: Db, embedding: number[], opt
 
 export async function searchKnowledge(db: Db, assistantId: string | null, embedding: number[], opts: { k?: number; minSimilarity?: number } = {}) {
   const k = opts.k ?? 8;
-  const [globalResults, assistantResults] = await Promise.all([
+  const memorySimilarity = sql<number>`1 - (${cosineDistance(corporateMemories.embedding, embedding)})`;
+  const [globalResults, assistantResults, memoryResults] = await Promise.all([
     searchGlobalContextChunks(db, embedding, { ...opts, k }),
     assistantId ? searchChunks(db, assistantId, embedding, { ...opts, k }) : Promise.resolve([]),
+    db.select({
+      content: corporateMemories.content,
+      filename: sql<string>`'Memória corporativa interna'`,
+      similarity: memorySimilarity,
+    }).from(corporateMemories).where(and(
+      eq(corporateMemories.status, "ready"),
+      gt(memorySimilarity, opts.minSimilarity ?? 0.25),
+    )).orderBy(desc(memorySimilarity)).limit(k),
   ]);
-  return [...globalResults, ...assistantResults]
+  return [...globalResults, ...assistantResults, ...memoryResults]
     .sort((a, b) => Number(b.similarity) - Number(a.similarity))
     .slice(0, k);
 }
 
 export async function hasReadyKnowledge(db: Db, assistantId: string | null) {
-  const [globalFile, assistantReady] = await Promise.all([
+  const [globalFile, memory, assistantReady] = await Promise.all([
     db.select({ id: globalContextFiles.id }).from(globalContextFiles)
       .where(eq(globalContextFiles.status, "ready")).limit(1),
+    db.select({ id: corporateMemories.id }).from(corporateMemories).where(eq(corporateMemories.status, "ready")).limit(1),
     assistantId ? hasReadyFiles(db, assistantId) : Promise.resolve(false),
   ]);
-  return globalFile.length > 0 || assistantReady;
+  return globalFile.length > 0 || memory.length > 0 || assistantReady;
 }

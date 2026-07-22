@@ -28,6 +28,8 @@ export const POST = apiHandler(async (req) => {
     size: buffer.byteLength,
     storagePath: storedName,
     createdBy: session.user.id,
+    sourceType: "admin",
+    sourceUserId: session.user.id,
   }).returning();
   startGlobalContextIngestion(db, row.id);
   return Response.json(row, { status: 202 });

@@ -1,5 +1,5 @@
-import { stepCountIs, streamText, isTextUIPart, type UIMessage } from "ai";
-import { and, eq } from "drizzle-orm";
+import { stepCountIs, streamText, isTextUIPart, type ToolSet, type UIMessage } from "ai";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiHandler, requireSession } from "@/lib/services/guards";
 import {
@@ -18,13 +18,16 @@ import { getModelPolicy, isModelEnabled } from "@/lib/ai/models";
 import { composeSystemPrompt } from "@/lib/ai/system-prompt";
 import { generateConversationTitle } from "@/lib/ai/title";
 import { makeKnowledgeTool } from "@/lib/ai/knowledge-tool";
-import { assistants, chatUploads } from "@/lib/db/schema";
+import { assistants, chatUploads, globalContextFiles } from "@/lib/db/schema";
 import { hasReadyKnowledge } from "@/lib/rag/search";
 import { getPublicError } from "@/lib/errors/public-error";
 import { canUserAccessAssistant } from "@/lib/services/assistants";
 import { filterUserModels, getUserAccess } from "@/lib/services/users";
 import { SUPPORTED_MODELS } from "@/lib/ai/models";
 import { getGlobalContext } from "@/lib/services/global-context";
+import { captureCorporateMemory } from "@/lib/services/corporate-memory";
+import { createAgentTools } from "@/lib/ai/agent-tools";
+import { AGENT_TYPE_INSTRUCTIONS } from "@/lib/ai/agent-types";
 
 export const maxDuration = 150;
 
@@ -66,17 +69,24 @@ export const POST = apiHandler(async (req) => {
   }
   const modelPolicy = getModelPolicy(modelId)!;
   const temBase = await hasReadyKnowledge(db, assistant?.id ?? null);
-  const systemPrompt = composeSystemPrompt({ globalContext, assistantPrompt: assistant?.systemPrompt, hasKnowledge: temBase });
+  const agentType = assistant?.agentType ?? "chat";
+  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType]].filter(Boolean).join("\n\n");
+  const systemPrompt = composeSystemPrompt({ globalContext, assistantPrompt, hasKnowledge: temBase });
 
   const storedNames = newMessage.parts
     .filter((part) => part.type === "file")
     .map((part) => part.url.slice("/api/files/".length));
   if (storedNames.length > 0) {
-    const owned = await db.select({ storedName: chatUploads.storedName }).from(chatUploads).where(and(
+    const owned = await db.select({ id: chatUploads.id, storedName: chatUploads.storedName }).from(chatUploads).where(and(
       eq(chatUploads.userId, session.user.id),
     ));
     const ownedNames = new Set(owned.map((item) => item.storedName));
     if (storedNames.some((name) => !ownedNames.has(name))) throw new Error("Anexo não encontrado ou sem permissão");
+    const uploadIds = owned.filter((item) => storedNames.includes(item.storedName)).map((item) => item.id);
+    if (uploadIds.length > 0) await Promise.all([
+      db.update(chatUploads).set({ conversationId: body.conversationId }).where(inArray(chatUploads.id, uploadIds)),
+      db.update(globalContextFiles).set({ sourceConversationId: body.conversationId }).where(inArray(globalContextFiles.sourceUploadId, uploadIds)),
+    ]);
   }
 
   const turn = await appendChatTurn(db, {
@@ -84,6 +94,15 @@ export const POST = apiHandler(async (req) => {
     clientId: newMessage.id,
     userParts: newMessage.parts,
   });
+  if (settings.autoLearnEnabled) {
+    const memoryContent = newMessage.parts.filter(isTextUIPart).map((part) => part.text).join("\n");
+    if (memoryContent.trim()) void captureCorporateMemory(db, {
+      userId: session.user.id,
+      conversationId: body.conversationId,
+      messageId: turn.userMessage.id,
+      content: memoryContent,
+    }).catch((error) => console.error("[memória-corporativa] não foi possível registrar a mensagem", error));
+  }
   const history = limitConversationContext(toUiMessages(await getCompletedMessages(db, body.conversationId)));
   const maxOutputTokens = Math.min(settings.maxOutputTokens, modelPolicy.maxOutputTokens);
   const startedAt = Date.now();
@@ -109,12 +128,15 @@ export const POST = apiHandler(async (req) => {
         )).limit(1).then((rows) => rows[0]),
       ),
     });
-    let knowledgeCalls = 0;
-    const tools = temBase && modelPolicy.supportsTools ? {
+    let toolCalls = 0;
+    const beforeToolCall = () => {
+      toolCalls += 1;
+      if (toolCalls > CHAT_LIMITS.maxToolCalls) throw new Error("Limite de ferramentas desta resposta atingido");
+    };
+    const knowledgeTools: ToolSet = temBase ? {
       buscarConhecimento: makeKnowledgeTool(db, openai, assistant?.id ?? null, {
         beforeCall: () => {
-          knowledgeCalls += 1;
-          if (knowledgeCalls > CHAT_LIMITS.maxToolCalls) throw new Error("Limite de consultas à base de conhecimento atingido");
+          beforeToolCall();
         },
         onEmbeddingUsage: (usage) => recordEmbeddingUsage(db, {
           ...usage,
@@ -122,7 +144,13 @@ export const POST = apiHandler(async (req) => {
           conversationId: body.conversationId as string,
         }),
       }),
-    } : undefined;
+    } : {};
+    const agentTools = createAgentTools(db, agentType, {
+      userId: session.user.id,
+      conversationId: body.conversationId,
+      assistantId: assistant?.id,
+    }, { beforeCall: beforeToolCall });
+    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools } : undefined;
     let failurePersistence: Promise<void> | null = null;
     const markInterrupted = (reason: string) => {
       failurePersistence ??= (async () => {
@@ -141,7 +169,7 @@ export const POST = apiHandler(async (req) => {
       maxOutputTokens,
       stopWhen: stepCountIs(CHAT_LIMITS.maxToolCalls + 1),
       tools,
-      timeout: { totalMs: CHAT_LIMITS.totalTimeoutMs, toolMs: 30_000 },
+      timeout: { totalMs: CHAT_LIMITS.totalTimeoutMs, toolMs: 120_000 },
       onError: ({ error }) => markInterrupted(getPublicError(error).message),
       onAbort: () => markInterrupted("Resposta interrompida"),
     });

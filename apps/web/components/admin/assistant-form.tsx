@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { SUPPORTED_MODELS } from "@/lib/ai/models";
 import type { getAssistant } from "@/lib/services/assistants";
+import { AGENT_PROMPT_TEMPLATES, AGENT_TYPE_LABELS, AGENT_TYPES, type AgentType } from "@/lib/ai/agent-types";
 
 type AssistantRow = NonNullable<Awaited<ReturnType<typeof getAssistant>>>;
 
@@ -22,15 +23,16 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
   const [aberto, setAberto] = useState(false);
   const [name, setName] = useState(assistant?.name ?? "");
   const [description, setDescription] = useState(assistant?.description ?? "");
-  const [systemPrompt, setSystemPrompt] = useState(assistant?.systemPrompt ?? "");
+  const [systemPrompt, setSystemPrompt] = useState(assistant?.systemPrompt ?? AGENT_PROMPT_TEMPLATES.chat);
   const [model, setModel] = useState(assistant?.model ?? MODELO_PADRAO);
+  const [agentType, setAgentType] = useState<AgentType>(assistant?.agentType ?? "chat");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   function resetar(novoAberto: boolean) {
     setAberto(novoAberto);
     if (!novoAberto) {
-      setName(""); setDescription(""); setSystemPrompt(""); setModel(MODELO_PADRAO); setErro(null);
+      setName(""); setDescription(""); setSystemPrompt(AGENT_PROMPT_TEMPLATES.chat); setModel(MODELO_PADRAO); setAgentType("chat"); setErro(null);
     }
   }
 
@@ -41,6 +43,7 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
       description,
       systemPrompt,
       model: model === MODELO_PADRAO ? null : model,
+      agentType,
     };
     const res = assistant
       ? await fetch(`/api/assistants/${assistant.id}`, { method: "PATCH", body: JSON.stringify(body) })
@@ -77,6 +80,17 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Breve descrição (opcional)"
         />
+      </div>
+      <div className="space-y-2">
+        <Label>Tipo de agente</Label>
+        <Select value={agentType} onValueChange={(value) => {
+          const next = value as AgentType;
+          setAgentType(next);
+          if (!assistant && (!systemPrompt.trim() || Object.values(AGENT_PROMPT_TEMPLATES).includes(systemPrompt))) setSystemPrompt(AGENT_PROMPT_TEMPLATES[next]);
+        }}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>{AGENT_TYPES.map((type) => <SelectItem key={type} value={type}>{AGENT_TYPE_LABELS[type]}</SelectItem>)}</SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="assistant-prompt">System prompt</Label>
@@ -119,7 +133,7 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo assistente</DialogTitle>
-          <DialogDescription>Configure o nome, o comportamento e o modelo do assistente.</DialogDescription>
+          <DialogDescription>Configure o tipo, o comportamento e o modelo do agente.</DialogDescription>
         </DialogHeader>
         {campos}
       </DialogContent>

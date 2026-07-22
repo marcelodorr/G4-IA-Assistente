@@ -27,6 +27,7 @@ export async function getSettings(db: Db) {
     monthlyTokenLimit: row?.monthlyTokenLimit ?? 4_000_000,
     maxOutputTokens: row?.maxOutputTokens ?? 2_048,
     disabledModels,
+    autoLearnEnabled: row?.autoLearnEnabled ?? true,
   };
 }
 

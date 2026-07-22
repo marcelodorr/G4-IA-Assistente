@@ -114,6 +114,27 @@ export async function recordEmbeddingUsage(db: Db, input: {
   });
 }
 
+export async function recordGenerationUsage(db: Db, input: {
+  userId: string;
+  conversationId?: string | null;
+  kind: "image" | "artifact";
+  model: string;
+  durationMs: number;
+  success: boolean;
+  error?: string | null;
+}) {
+  await db.insert(aiUsage).values({
+    userId: input.userId,
+    conversationId: input.conversationId,
+    kind: input.kind,
+    model: input.model,
+    durationMs: input.durationMs,
+    success: input.success,
+    error: input.error?.slice(0, 500) ?? null,
+    finishedAt: new Date(),
+  });
+}
+
 export async function recordCompletedChatUsage(db: Db, input: {
   userId: string;
   conversationId: string;

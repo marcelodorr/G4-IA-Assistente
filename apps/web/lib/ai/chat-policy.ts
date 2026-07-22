@@ -6,7 +6,7 @@ export const CHAT_LIMITS = {
   maxHistoryMessages: 30,
   maxContextChars: 100_000,
   maxToolCalls: 3,
-  totalTimeoutMs: 120_000,
+  totalTimeoutMs: 145_000,
 } as const;
 
 type SafeFilePart = { type: "file"; url: string; mediaType: string; filename: string };

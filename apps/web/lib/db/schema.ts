@@ -40,6 +40,7 @@ export const settings = pgTable("settings", {
   maxOutputTokens: integer("max_output_tokens").notNull().default(2048),
   disabledModels: jsonb("disabled_models").notNull().default([]),
   globalContext: text("global_context").notNull().default(""),
+  autoLearnEnabled: boolean("auto_learn_enabled").notNull().default(true),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -49,6 +50,7 @@ export const assistants = pgTable("assistants", {
   description: text("description"),
   systemPrompt: text("system_prompt").notNull(),
   model: text("model"),
+  agentType: text("agent_type", { enum: ["chat", "image", "budget", "presentation", "document"] }).notNull().default("chat"),
   active: boolean("active").notNull().default(true),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -96,8 +98,12 @@ export const globalContextFiles = pgTable("global_context_files", {
   status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
   error: text("error"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  sourceType: text("source_type", { enum: ["admin", "chat_upload"] }).notNull().default("admin"),
+  sourceUserId: uuid("source_user_id").references(() => users.id, { onDelete: "set null" }),
+  sourceConversationId: uuid("source_conversation_id"),
+  sourceUploadId: uuid("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [uniqueIndex("global_context_files_source_upload_idx").on(t.sourceUploadId)]);
 
 export const globalContextChunks = pgTable("global_context_chunks", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -142,15 +148,47 @@ export const chatUploads = pgTable("chat_uploads", {
   filename: text("filename").notNull(),
   mime: text("mime").notNull(),
   size: integer("size").notNull(),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [index("chat_uploads_user_idx").on(t.userId)]);
+
+export const corporateMemories = pgTable("corporate_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  messageId: uuid("message_id").references(() => messages.id, { onDelete: "set null" }).unique(),
+  content: text("content").notNull(),
+  status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
+  error: text("error"),
+  embedding: vector("embedding", { dimensions: 1536 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("corporate_memories_status_idx").on(t.status),
+  index("corporate_memories_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+]);
+
+export const artifacts = pgTable("artifacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
+  kind: text("kind", { enum: ["image", "spreadsheet", "document", "presentation", "pdf"] }).notNull(),
+  filename: text("filename").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("artifacts_user_created_idx").on(t.userId, t.createdAt),
+  index("artifacts_conversation_idx").on(t.conversationId),
+]);
 
 export const aiUsage = pgTable("ai_usage", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   messageId: uuid("message_id").references(() => messages.id, { onDelete: "set null" }),
-  kind: text("kind", { enum: ["chat", "embedding"] }).notNull(),
+  kind: text("kind", { enum: ["chat", "embedding", "image", "artifact"] }).notNull(),
   model: text("model").notNull(),
   inputTokens: integer("input_tokens").notNull().default(0),
   outputTokens: integer("output_tokens").notNull().default(0),

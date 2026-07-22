@@ -13,11 +13,27 @@ import { Textarea } from "@/components/ui/textarea";
 export type ContextFile = {
   id: string;
   filename: string;
+  storagePath: string;
   size: number;
   status: "pending" | "processing" | "ready" | "error";
   error: string | null;
+  sourceType: "admin" | "chat_upload";
+  sourceUserName: string | null;
+  sourceUserEmail: string | null;
   createdAt: string;
   stale: boolean;
+};
+
+export type CorporateMemory = {
+  id: string;
+  content: string;
+  status: "pending" | "processing" | "ready" | "error";
+  error: string | null;
+  conversationId: string | null;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  createdAt: string;
 };
 
 function formatSize(bytes: number) {
@@ -33,17 +49,25 @@ function FileStatus({ file }: { file: ContextFile }) {
   return <Badge variant="secondary"><Loader2Icon className="size-3 animate-spin" />{file.status === "pending" ? "Aguardando" : "Processando"}</Badge>;
 }
 
-export function GlobalContextForm({ initialContent, initialFiles }: { initialContent: string; initialFiles: ContextFile[] }) {
+export function GlobalContextForm({ initialContent, initialFiles, initialMemories, initialAutoLearn }: { initialContent: string; initialFiles: ContextFile[]; initialMemories: CorporateMemory[]; initialAutoLearn: boolean }) {
   const [content, setContent] = useState(initialContent);
+  const [autoLearn, setAutoLearn] = useState(initialAutoLearn);
   const [files, setFiles] = useState<ContextFile[]>(initialFiles);
+  const [memories, setMemories] = useState<CorporateMemory[]>(initialMemories);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [busyFile, setBusyFile] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadFiles = useCallback(async () => {
     const response = await fetch("/api/context/files");
     if (response.ok) setFiles(await response.json());
+  }, []);
+
+  const loadMemories = useCallback(async () => {
+    const response = await fetch("/api/context/memories");
+    if (response.ok) setMemories(await response.json());
   }, []);
 
   useEffect(() => {
@@ -54,10 +78,31 @@ export function GlobalContextForm({ initialContent, initialFiles }: { initialCon
 
   async function save() {
     setSaving(true);
-    const response = await fetch("/api/context", { method: "PATCH", body: JSON.stringify({ content }) });
+    const response = await fetch("/api/context", { method: "PATCH", body: JSON.stringify({ content, autoLearnEnabled: autoLearn }) });
     setSaving(false);
     if (!response.ok) return toast.error((await response.json()).error ?? "Erro ao salvar contexto geral");
     toast.success("Contexto geral salvo e já aplicado às novas respostas");
+  }
+
+  async function memoryAction(memory: CorporateMemory, method: "POST" | "DELETE") {
+    setBusyFile(memory.id);
+    const response = await fetch(`/api/context/memories/${memory.id}`, { method });
+    setBusyFile(null);
+    if (!response.ok) return toast.error((await response.json()).error ?? "Erro ao processar memória");
+    if (method === "DELETE") setMemories((current) => current.filter((item) => item.id !== memory.id));
+    else {
+      await loadMemories();
+    }
+  }
+
+  async function importHistory() {
+    setImporting(true);
+    const response = await fetch("/api/context/backfill", { method: "POST" });
+    setImporting(false);
+    if (!response.ok) return toast.error((await response.json()).error ?? "Erro ao importar histórico");
+    const result = await response.json() as { filesQueued: number; memoriesQueued: number; hasMore: boolean };
+    toast.success(`${result.filesQueued} arquivo(s) e ${result.memoriesQueued} memória(s) enviados para processamento${result.hasMore ? ". Execute novamente para continuar." : "."}`);
+    await Promise.all([loadFiles(), loadMemories()]);
   }
 
   async function upload(file: File) {
@@ -86,6 +131,7 @@ export function GlobalContextForm({ initialContent, initialFiles }: { initialCon
         <CardContent className="space-y-3">
           <Label htmlFor="global-context">Contexto geral da aplicação</Label>
           <Textarea id="global-context" className="min-h-72" maxLength={50_000} value={content} onChange={(event) => setContent(event.target.value)} placeholder="Ex.: A Sequor atua... Sempre considere... Nunca..." />
+          <label className="flex items-start gap-3 rounded-md border p-3"><input className="mt-1" type="checkbox" checked={autoLearn} onChange={(event) => setAutoLearn(event.target.checked)} /><span><span className="block font-medium">Aprendizado corporativo automático</span><span className="text-xs text-muted-foreground">Indexa documentos anexados e informações escritas pelos usuários, com origem auditável e gestão exclusiva do administrador.</span></span></label>
           <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{content.length.toLocaleString("pt-BR")} / 50.000 caracteres</span><Button onClick={save} disabled={saving}>{saving ? "Salvando..." : "Salvar diretrizes"}</Button></div>
         </CardContent>
       </Card>
@@ -100,17 +146,31 @@ export function GlobalContextForm({ initialContent, initialFiles }: { initialCon
           </div>
           <div className="overflow-x-auto rounded-md border">
             <Table>
-              <TableHeader><TableRow><TableHead>Arquivo</TableHead><TableHead>Tamanho</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Arquivo</TableHead><TableHead>Origem</TableHead><TableHead>Tamanho</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
                 {files.map((file) => <TableRow key={file.id}>
-                  <TableCell className="font-medium">{file.filename}</TableCell><TableCell>{formatSize(file.size)}</TableCell><TableCell><FileStatus file={file} /></TableCell>
+                  <TableCell className="font-medium"><a className="hover:underline" href={`/api/files/${file.storagePath}`}>{file.filename}</a></TableCell><TableCell><div>{file.sourceType === "admin" ? "Administrador" : "Conversa"}</div>{file.sourceUserName && <div className="text-xs text-muted-foreground">{file.sourceUserName}</div>}</TableCell><TableCell>{formatSize(file.size)}</TableCell><TableCell><FileStatus file={file} /></TableCell>
                   <TableCell><div className="flex justify-end gap-1">{(file.status === "error" || file.stale) && <Button size="sm" variant="outline" disabled={busyFile === file.id} onClick={() => void fileAction(file, "POST")}>Tentar novamente</Button>}<Button size="icon-sm" variant="ghost" aria-label={`Remover ${file.filename}`} disabled={busyFile === file.id} onClick={() => void fileAction(file, "DELETE")}><XIcon /></Button></div></TableCell>
                 </TableRow>)}
-                {files.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Nenhum arquivo no contexto geral.</TableCell></TableRow>}
+                {files.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum arquivo no contexto geral.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>
         </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>Memórias capturadas das conversas</CardTitle><CardDescription>Somente administradores visualizam o texto bruto, autor e origem. Remova informações incorretas ou inadequadas.</CardDescription></div><Button variant="outline" disabled={importing} onClick={() => void importHistory()}>{importing ? "Importando..." : "Importar histórico"}</Button></div></CardHeader>
+        <CardContent><div className="max-h-[34rem] overflow-auto rounded-md border"><Table>
+          <TableHeader><TableRow><TableHead>Informação</TableHead><TableHead>Autor</TableHead><TableHead>Status</TableHead><TableHead>Data</TableHead><TableHead /></TableRow></TableHeader>
+          <TableBody>{memories.map((memory) => <TableRow key={memory.id}>
+            <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{memory.content}</p>{memory.conversationId && <span className="text-xs text-muted-foreground">Conversa {memory.conversationId.slice(0, 8)}</span>}</TableCell>
+            <TableCell><div>{memory.userName ?? "Usuário removido"}</div><div className="text-xs text-muted-foreground">{memory.userEmail}</div></TableCell>
+            <TableCell><Badge variant={memory.status === "error" ? "destructive" : memory.status === "ready" ? "default" : "secondary"}>{memory.status === "ready" ? "Pronta" : memory.status === "error" ? "Erro" : "Processando"}</Badge></TableCell>
+            <TableCell className="whitespace-nowrap text-xs">{new Date(memory.createdAt).toLocaleString("pt-BR")}</TableCell>
+            <TableCell><div className="flex justify-end gap-1">{memory.status === "error" && <Button size="sm" variant="outline" disabled={busyFile === memory.id} onClick={() => void memoryAction(memory, "POST")}>Reprocessar</Button>}<Button size="icon-sm" variant="ghost" disabled={busyFile === memory.id} aria-label="Remover memória" onClick={() => void memoryAction(memory, "DELETE")}><XIcon /></Button></div></TableCell>
+          </TableRow>)}{memories.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhuma memória capturada.</TableCell></TableRow>}</TableBody>
+        </Table></div></CardContent>
       </Card>
     </div>
   );

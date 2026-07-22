@@ -6,6 +6,7 @@ import { assistantFiles } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { AssistantForm } from "@/components/admin/assistant-form";
+import { AGENT_TYPE_LABELS } from "@/lib/ai/agent-types";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function AdminAssistentesPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  {contagemPorAssistente.get(assistente.id) ?? 0} arquivo(s) na base de conhecimento
+                  {AGENT_TYPE_LABELS[assistente.agentType]} · {contagemPorAssistente.get(assistente.id) ?? 0} arquivo(s) na base
                 </p>
               </CardContent>
             </Card>

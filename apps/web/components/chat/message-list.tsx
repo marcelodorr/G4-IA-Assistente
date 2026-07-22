@@ -47,9 +47,21 @@ function ToolChip({ part }: { part: MessagePart }) {
   const state = "state" in part ? part.state : undefined;
   const done = state === "output-available" || state === "output-error" || state === "output-denied";
   const failed = state === "output-error" || state === "output-denied";
+  const name = part.type.slice("tool-".length);
+  const output = "output" in part && part.output && typeof part.output === "object" ? part.output as Record<string, unknown> : null;
+  const downloadUrl = typeof output?.downloadUrl === "string" && output.downloadUrl.startsWith("/api/artifacts/") ? output.downloadUrl : null;
+  const filename = typeof output?.filename === "string" ? output.filename : "arquivo gerado";
+  const actionLabel: Record<string, string> = {
+    buscarConhecimento: "Consultando base de conhecimento",
+    gerarImagem: "Gerando imagem",
+    gerarOrcamento: "Gerando orçamento",
+    gerarApresentacao: "Gerando apresentação",
+    gerarDocumento: "Gerando documento",
+  };
+  if (downloadUrl && done && !failed) return <a className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:underline" href={downloadUrl}>↓ Baixar {filename}</a>;
   return (
     <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-secondary/60 px-3 py-1 text-xs text-muted-foreground">
-      {failed ? "Não foi possível consultar a base" : done ? "✓ Base consultada" : "🔎 Consultando base de conhecimento…"}
+      {failed ? "Não foi possível concluir a ferramenta" : done ? `✓ ${actionLabel[name] ?? "Ferramenta concluída"}` : `${actionLabel[name] ?? "Executando ferramenta"}…`}
     </div>
   );
 }

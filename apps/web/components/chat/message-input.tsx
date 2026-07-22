@@ -73,7 +73,7 @@ export function MessageInput({
           ref={inputRef}
           type="file"
           hidden
-          accept="image/png,image/jpeg,image/webp,application/pdf"
+          accept=".png,.jpg,.jpeg,.webp,.pdf,.xlsx,.xls,.txt,.md,.csv,.json,.yaml,.yml"
           onChange={attach}
         />
         <Button
