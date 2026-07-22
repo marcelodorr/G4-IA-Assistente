@@ -156,9 +156,47 @@ export async function getUsageDashboard(db: Db) {
     where a.created_at >= ${month}
     group by c.id, u.name order by tokens desc limit 20
   `);
+  // postgres-js pode devolver colunas bigint como string ou bigint. Converta
+  // tudo antes de atravessar a fronteira Server Component -> Client Component.
+  // Um bigint em `byUser`, por exemplo, derruba a página inteira durante a
+  // serialização do React Server Components.
+  const numberValue = (value: unknown) => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const nullableNumber = (value: unknown) => value == null ? null : numberValue(value);
+  const totalRow = (totals[0] ?? {}) as Record<string, unknown>;
+
   return {
-    totals: (totals[0] ?? { inputTokens: 0, outputTokens: 0, costMicros: 0, calls: 0, failures: 0 }) as unknown as { inputTokens: number; outputTokens: number; costMicros: number; calls: number; failures: number },
-    byUser: [...byUser] as unknown as Array<{ id: string; name: string; email: string; todayTokens: number; monthTokens: number; costMicros: number; dailyTokenLimit: number | null; monthlyTokenLimit: number | null }>,
-    byConversation: [...byConversation] as unknown as Array<{ id: string; title: string; userName: string; tokens: number; costMicros: number }>,
+    totals: {
+      inputTokens: numberValue(totalRow.inputTokens),
+      outputTokens: numberValue(totalRow.outputTokens),
+      costMicros: numberValue(totalRow.costMicros),
+      calls: numberValue(totalRow.calls),
+      failures: numberValue(totalRow.failures),
+    },
+    byUser: [...byUser].map((value) => {
+      const row = value as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        name: String(row.name ?? ""),
+        email: String(row.email ?? ""),
+        todayTokens: numberValue(row.todayTokens),
+        monthTokens: numberValue(row.monthTokens),
+        costMicros: numberValue(row.costMicros),
+        dailyTokenLimit: nullableNumber(row.dailyTokenLimit),
+        monthlyTokenLimit: nullableNumber(row.monthlyTokenLimit),
+      };
+    }),
+    byConversation: [...byConversation].map((value) => {
+      const row = value as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        title: String(row.title ?? "Nova conversa"),
+        userName: String(row.userName ?? ""),
+        tokens: numberValue(row.tokens),
+        costMicros: numberValue(row.costMicros),
+      };
+    }),
   };
 }

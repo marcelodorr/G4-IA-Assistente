@@ -8,7 +8,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export const dynamic = "force-dynamic";
 
 export default async function UsagePage() {
-  const [usage, settings] = await Promise.all([getUsageDashboard(db), getSettings(db)]);
+  let data: Awaited<ReturnType<typeof getUsageDashboard>>;
+  let settings: Awaited<ReturnType<typeof getSettings>>;
+  try {
+    [data, settings] = await Promise.all([getUsageDashboard(db), getSettings(db)]);
+  } catch (error) {
+    console.error("[admin/uso] Falha ao carregar o painel de uso", error);
+    return (
+      <main className="mx-auto max-w-6xl space-y-6 p-6">
+        <div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div>
+        <Card>
+          <CardHeader><CardTitle>Não foi possível carregar os dados de uso</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>A aplicação continua disponível, mas a consulta de métricas falhou.</p>
+            <p>Confirme no log do Dokploy se as migrations foram concluídas e depois atualize esta página.</p>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+  const usage = data;
   const totalTokens = Number(usage.totals.inputTokens) + Number(usage.totals.outputTokens);
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">

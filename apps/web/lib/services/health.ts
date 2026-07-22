@@ -41,8 +41,10 @@ async function storageCheck(): Promise<Check & { totalBytes?: number; freeBytes?
   try {
     await mkdir(uploadsDir(), { recursive: true });
     const stats = await statfs(uploadsDir());
-    const totalBytes = stats.blocks * stats.bsize;
-    const freeBytes = stats.bavail * stats.bsize;
+    // Normalize também protege a renderização caso a implementação da
+    // plataforma retorne os campos de statfs como bigint.
+    const totalBytes = Number(stats.blocks) * Number(stats.bsize);
+    const freeBytes = Number(stats.bavail) * Number(stats.bsize);
     const usedPercent = totalBytes > 0 ? ((totalBytes - freeBytes) / totalBytes) * 100 : 0;
     return {
       status: usedPercent >= 95 ? "error" : usedPercent >= 85 ? "warning" : "ok",
@@ -75,20 +77,31 @@ async function updateCheck(): Promise<Check & { currentVersion: string; latestVe
 
 export async function getAdminHealth() {
   const since = new Date(Date.now() - 24 * 60 * 60_000);
-  const [database, openai, storage, update] = await Promise.all([databaseCheck(), openAiCheck(), storageCheck(), updateCheck()]);
+  const checks = await Promise.all([databaseCheck(), openAiCheck(), storageCheck(), updateCheck()]);
+  let database = checks[0];
+  const [, openai, storage, update] = checks;
   let jobs: Array<{ status: string; total: number }> = [];
   let usage: Array<{ calls: number; failures: number; tokens: number }> = [];
   let configured = { hasOpenAiKey: false, defaultModel: "desconhecido" };
   if (database.status === "ok") {
-    [jobs, usage, configured] = await Promise.all([
-      db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status),
-      db.select({
-        calls: sql<number>`count(*)::int`,
-        failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
-        tokens: sql<number>`coalesce(sum(${aiUsage.inputTokens} + ${aiUsage.outputTokens}), 0)::int`,
-      }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`),
-      getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })),
-    ]);
+    try {
+      [jobs, usage, configured] = await Promise.all([
+        db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status),
+        db.select({
+          calls: sql<number>`count(*)::int`,
+          failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
+          tokens: sql<number>`coalesce(sum(${aiUsage.inputTokens} + ${aiUsage.outputTokens}), 0)::bigint`,
+        }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`),
+        getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })),
+      ]);
+    } catch (error) {
+      console.error("[admin/saude] Falha ao consultar métricas do banco", error);
+      database = {
+        ...database,
+        status: "warning",
+        message: "Conectado, mas as métricas falharam. Verifique as migrations.",
+      };
+    }
   }
   const jobCounts = Object.fromEntries(jobs.map((row) => [row.status, Number(row.total)]));
   return {
