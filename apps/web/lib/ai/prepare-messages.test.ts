@@ -39,6 +39,22 @@ describe("prepareModelMessages", () => {
     expect(data.url.toString()).toContain(`data:image/png;base64,${Buffer.from("PNGDATA").toString("base64")}`);
   });
 
+  it("SVG local é rasterizado para PNG antes de chegar ao modelo", async () => {
+    const out = await prepareModelMessages([
+      { id: "1", role: "user", parts: [
+        { type: "file", url: "/api/files/abc__vetor.svg", mediaType: "image/svg+xml", filename: "vetor.svg" },
+      ]},
+    ] as UIMessage[], {
+      ...deps,
+      readFile: async () => ({ buf: Buffer.from("<svg/>"), mime: "image/svg+xml" }),
+      rasterizeSvg: async () => Buffer.from("PNG-RASTERIZADO"),
+    });
+    const filePart = (out[0].content as UserContentPart[]).find((part): part is FilePart => part.type === "file");
+    const data = filePart?.data as { url: URL };
+    expect(filePart?.mediaType).toBe("image/png");
+    expect(data.url.toString()).toContain(Buffer.from("PNG-RASTERIZADO").toString("base64"));
+  });
+
   it("PDF local vira texto no contexto", async () => {
     const out = await prepareModelMessages([
       { id: "1", role: "user", parts: [

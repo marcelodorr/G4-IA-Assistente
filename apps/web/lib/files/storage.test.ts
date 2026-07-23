@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { saveUpload, readUpload, CHAT_MIMES, KB_MIMES, MAX_UPLOAD_BYTES } from "./storage";
+import { saveUpload, readUpload, CHAT_MIMES, KB_MIMES, MAX_UPLOAD_BYTES, assertUploadSize } from "./storage";
 
 describe("storage", () => {
   beforeEach(() => {
@@ -37,9 +37,8 @@ describe("storage", () => {
     await expect(saveUpload(Buffer.from("conteúdo"), filename, "", KB_MIMES)).resolves.toMatchObject({ mime });
   });
 
-  it("rejeita arquivo acima do limite", async () => {
-    const grande = Buffer.alloc(MAX_UPLOAD_BYTES + 1);
-    await expect(saveUpload(grande, "a.pdf", "application/pdf", CHAT_MIMES)).rejects.toThrow(/20 ?MB/i);
+  it("rejeita arquivo acima do limite de 200 MB sem alocar o arquivo em memória", () => {
+    expect(() => assertUploadSize(MAX_UPLOAD_BYTES + 1)).toThrow(/200 ?MB/i);
   });
 
   it("rejeita path traversal na leitura", async () => {

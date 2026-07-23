@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    // O proxy de autenticação também armazena o corpo da requisição. A folga
+    // cobre os metadados multipart de um arquivo com o limite útil de 200 MB.
+    proxyClientMaxBodySize: "201mb",
+  },
   // Pin the workspace root to the monorepo root (parent of apps/*) so tracing
   // is deterministic even when a stray lockfile exists further up the tree
   // (e.g. a git worktree nested inside another checkout during local dev).

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CHAT_LIMITS } from "@/lib/ai/chat-policy";
 import { Input } from "@/components/ui/input";
 import { LinkIcon } from "lucide-react";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/files/policy";
 
 // Formato compatível com FileUIPart (pacote "ai"): sendMessage({ text, files })
 // aceita FileList | FileUIPart[], e é isso que anexamos aqui.
@@ -33,6 +34,11 @@ export function MessageInput({
   async function attach(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
+      e.target.value = "";
+      return;
+    }
     if (files.length >= CHAT_LIMITS.maxAttachments) {
       toast.error(`Envie no máximo ${CHAT_LIMITS.maxAttachments} anexos`);
       e.target.value = "";
@@ -142,7 +148,7 @@ export function MessageInput({
         </Button>
       </div>
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        Até {CHAT_LIMITS.maxMessageChars.toLocaleString("pt-BR")} caracteres e {CHAT_LIMITS.maxAttachments} anexos. O Sequor IA Assistente pode cometer erros.
+        Até {CHAT_LIMITS.maxMessageChars.toLocaleString("pt-BR")} caracteres, {CHAT_LIMITS.maxAttachments} anexos e {MAX_UPLOAD_LABEL} por arquivo. O Sequor IA Assistente pode cometer erros.
       </p>
     </div>
   );

@@ -289,7 +289,7 @@ Cada evento deve guardar ator, ação, alvo e data.
 
 **Prioridade:** alta
 
-**Problema:** o código atual transforma o arquivo inteiro em `Buffer` antes de aplicar o limite de 20 MB.
+**Problema:** o código atual transforma o arquivo inteiro em `Buffer` antes de aplicar o limite de 200 MB.
 
 **O que fazer:**
 

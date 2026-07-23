@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/files/policy";
 
 type AssistantFileRow = {
   id: string;
@@ -101,6 +102,10 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
   }, [files, carregar]);
 
   async function enviarArquivo(arquivo: File) {
+    if (arquivo.size > MAX_UPLOAD_BYTES) {
+      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
+      return;
+    }
     setEnviando(true);
     const form = new FormData();
     form.append("file", arquivo);
@@ -155,7 +160,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Markdown, imagens, SVG, Excel, Word, PowerPoint e HTML usados como referência pelo assistente.
+          Markdown, imagens, SVG, Excel, Word, PowerPoint e HTML, até {MAX_UPLOAD_LABEL} por arquivo.
         </p>
         <div>
           <input

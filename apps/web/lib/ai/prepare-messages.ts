@@ -3,6 +3,7 @@ import { readUpload } from "@/lib/files/storage";
 import { extractText, getDocumentProxy } from "unpdf";
 import { extractTextFromFile } from "@/lib/rag/extract";
 import { KB_MIMES } from "@/lib/files/storage";
+import { rasterizeSvg } from "@/lib/files/image";
 
 const MAX_PDF_CHARS = 60_000; // ~15k tokens; acima disso trunca com aviso
 
@@ -15,11 +16,13 @@ async function defaultExtractPdfText(buf: Buffer): Promise<string> {
 type Deps = {
   readFile: (storedName: string) => Promise<{ buf: Buffer; mime: string }>;
   extractPdfText: (buf: Buffer) => Promise<string>;
+  rasterizeSvg?: (buf: Buffer) => Promise<Buffer>;
 };
 
 const defaultDeps: Deps = {
   readFile: readUpload,
   extractPdfText: defaultExtractPdfText,
+  rasterizeSvg,
 };
 
 export async function prepareModelMessages(
@@ -36,9 +39,11 @@ export async function prepareModelMessages(
       const storedName = part.url.slice("/api/files/".length);
       if (options.authorizeFile && !(await options.authorizeFile(storedName))) throw new Error("Anexo não encontrado ou sem permissão");
       const { buf, mime } = await deps.readFile(storedName);
-      if (mime.startsWith("image/") && mime !== "image/svg+xml") {
+      if (mime.startsWith("image/")) {
         if (options.allowImages === false) throw new Error("O modelo selecionado não aceita imagens");
-        parts.push({ ...part, url: `data:${mime};base64,${buf.toString("base64")}` });
+        const image = mime === "image/svg+xml" ? await (deps.rasterizeSvg ?? rasterizeSvg)(buf) : buf;
+        const mediaType = mime === "image/svg+xml" ? "image/png" : mime;
+        parts.push({ ...part, mediaType, url: `data:${mediaType};base64,${image.toString("base64")}` });
       } else if (KB_MIMES.includes(mime)) {
         let text = mime === "application/pdf" ? await deps.extractPdfText(buf) : await extractTextFromFile(buf, mime);
         if (text.length > MAX_PDF_CHARS) {

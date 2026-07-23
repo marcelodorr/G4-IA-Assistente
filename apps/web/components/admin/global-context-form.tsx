@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/files/policy";
 
 export type ContextFile = {
   id: string;
@@ -115,6 +116,10 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
   }
 
   async function upload(file: File) {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
+      return;
+    }
     setUploading(true);
     const form = new FormData();
     form.append("file", file);
@@ -160,7 +165,7 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
         <CardHeader><CardTitle>Documentos, skills e arquivos</CardTitle><CardDescription>Conteúdo indexado na base geral e pesquisado em qualquer conversa quando for relevante.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">Aceita Markdown, JPG/JPEG, PNG, SVG, Excel, Word, PowerPoint e HTML, até 20 MB.</p>
+            <p className="text-sm text-muted-foreground">Aceita Markdown, JPG/JPEG, PNG, SVG, Excel, Word, PowerPoint e HTML, até {MAX_UPLOAD_LABEL}.</p>
             <input ref={inputRef} className="hidden" type="file" accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
             <Button variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? "Enviando..." : "Adicionar arquivo"}</Button>
           </div>

@@ -1,8 +1,9 @@
 import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "./policy";
 
-export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES } from "./policy";
 export const KB_MIMES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -53,11 +54,15 @@ export async function saveUpload(buf: Buffer, originalName: string, mime: string
   const extensionMime = EXT_MIME[path.extname(originalName).toLowerCase()];
   const resolvedMime = allowed.includes(mime) ? mime : extensionMime ?? (mime || "application/octet-stream");
   if (!allowed.includes(resolvedMime)) throw new Error(`Tipo de arquivo não permitido: ${resolvedMime}`);
-  if (buf.byteLength > MAX_UPLOAD_BYTES) throw new Error("Arquivo excede o limite de 20 MB");
+  assertUploadSize(buf.byteLength);
   const storedName = `${randomUUID()}__${sanitize(originalName)}`;
   await mkdir(uploadsDir(), { recursive: true });
   await writeFile(path.join(uploadsDir(), storedName), buf);
   return { storedName, mime: resolvedMime };
+}
+
+export function assertUploadSize(size: number) {
+  if (size > MAX_UPLOAD_BYTES) throw new Error(`Arquivo excede o limite de ${MAX_UPLOAD_LABEL}`);
 }
 
 export async function readUpload(storedName: string) {
