@@ -13,6 +13,20 @@ Esta fase adiciona Google Calendar, HubSpot, Pipedrive, Apify e Jira ao Sequor I
 
 Tokens de acesso, refresh tokens, Client Secrets e o token da Apify são criptografados com `ENCRYPTION_KEY`. As consultas iniciais e as consultas feitas no chat são incorporadas à base corporativa, com origem identificada para gestão exclusiva do administrador.
 
+## Como o usuário chama uma integração no chat
+
+Não existe comando especial, barra (`/`) ou botão dentro da mensagem. Depois que a conta estiver conectada, o usuário escreve o pedido em português normal e, quando os dados atuais forem necessários, o agente chama a ferramenta correta automaticamente.
+
+Exemplos:
+
+- `Quais compromissos tenho hoje no Google Calendar?`
+- `Busque no HubSpot o contato maria@empresa.com.`
+- `Procure no Pipedrive negócios relacionados à empresa ABC.`
+- `Leia os primeiros 20 itens do dataset ABC123 na Apify.`
+- `No Jira, liste bugs de alta prioridade do projeto MES.`
+
+Durante a consulta, o chat mostra um aviso como **Consultando Jira...**. Depois, o agente transforma os dados retornados em uma resposta legível. Se uma plataforma não estiver conectada ou liberada, sua ferramenta não fica disponível para aquele usuário.
+
 ## Variável obrigatória para OAuth
 
 Configure no serviço do Dokploy:

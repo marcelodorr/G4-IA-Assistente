@@ -7,6 +7,8 @@ describe("integration catalog", () => {
     expect(INTEGRATION_PROVIDERS).toEqual(["google_calendar", "hubspot", "pipedrive", "apify", "jira"]);
     expect(INTEGRATIONS.apify.authType).toBe("token");
     expect(INTEGRATIONS.jira.scopes).toContain("offline_access");
+    expect(INTEGRATIONS.google_calendar.examplePrompts.length).toBeGreaterThan(1);
+    expect(INTEGRATIONS.hubspot.capabilities).toContain("Consultar negócios e seus estágios");
   });
 
   it("valida provider e respeita origem pública configurada", () => {

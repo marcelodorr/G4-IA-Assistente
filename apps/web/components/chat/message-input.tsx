@@ -14,11 +14,15 @@ export type Attachment = { type: "file"; url: string; mediaType: string; filenam
 export function MessageInput({
   onSend,
   disabled,
+  initialText = "",
+  suggestions = [],
 }: {
   onSend: (text: string, files: Attachment[]) => void;
   disabled: boolean;
+  initialText?: string;
+  suggestions?: string[];
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [files, setFiles] = useState<Attachment[]>([]);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -77,6 +81,12 @@ export function MessageInput({
 
   return (
     <div className="border-t p-4">
+      {suggestions.length > 0 && !text && (
+        <div className="mb-3 space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Experimente perguntar:</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">{suggestions.slice(0, 4).map((suggestion) => <button key={suggestion} type="button" className="max-w-xs shrink-0 rounded-full border bg-background px-3 py-1.5 text-left text-xs hover:border-primary hover:text-primary" onClick={() => setText(suggestion)}>{suggestion}</button>)}</div>
+        </div>
+      )}
       {mostrarLink && (
         <div className="mb-2 flex gap-2">
           <Input type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void attachLink(); } }} placeholder="https://www.exemplo.com.br/pagina" autoFocus />

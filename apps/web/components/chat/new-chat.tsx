@@ -12,10 +12,14 @@ export function NewChat({
   assistants,
   defaultModel,
   models,
+  initialPrompt = "",
+  integrationSuggestions = [],
 }: {
   assistants: AssistantSummary[];
   defaultModel: string | null;
   models: string[];
+  initialPrompt?: string;
+  integrationSuggestions?: string[];
 }) {
   const router = useRouter();
   const [assistantId, setAssistantId] = useState<string | null>(null);
@@ -59,7 +63,8 @@ export function NewChat({
           <AssistantPicker assistants={assistants} value={assistantId} onChange={setAssistantId} />
           <ModelPicker value={model} onChange={setModel} models={models} />
         </div>
-        <MessageInput onSend={onSend} disabled={criando || models.length === 0} />
+        {integrationSuggestions.length > 0 && <p className="rounded-lg border bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"><span className="font-medium text-foreground">Como usar integrações:</span> escreva seu pedido normalmente. O agente identifica e consulta a plataforma conectada automaticamente — não existe comando especial.</p>}
+        <MessageInput onSend={onSend} disabled={criando || models.length === 0} initialText={initialPrompt} suggestions={integrationSuggestions} />
       </div>
     </div>
   );

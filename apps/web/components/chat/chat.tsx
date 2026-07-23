@@ -6,17 +6,20 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MessageList } from "./message-list";
 import { MessageInput, type Attachment } from "./message-input";
+import Link from "next/link";
 
 export function Chat({
   conversationId,
   initialMessages,
   interruptedMessageIds,
   assistantName,
+  integrationNames = [],
 }: {
   conversationId: string;
   initialMessages: UIMessage[];
   interruptedMessageIds: string[];
   assistantName?: string | null;
+  integrationNames?: string[];
 }) {
   const router = useRouter();
   const { messages, sendMessage, status, error } = useChat({
@@ -66,6 +69,11 @@ export function Chat({
       {assistantName && (
         <div className="border-b px-4 py-2 text-sm text-muted-foreground">
           Assistente: <span className="text-primary">{assistantName}</span>
+        </div>
+      )}
+      {integrationNames.length > 0 && (
+        <div className="border-b bg-secondary/20 px-4 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Integrações prontas:</span> {integrationNames.join(", ")}. Escreva normalmente o que deseja consultar; o agente escolhe a ferramenta. <Link href="/integracoes" className="text-primary hover:underline">Ver exemplos</Link>
         </div>
       )}
       <MessageList messages={messages} streaming={status === "streaming"} interruptedMessageIds={interruptedMessageIds} />

@@ -6,6 +6,7 @@ import { getConversation } from "@/lib/services/conversations";
 import { assistants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { Chat } from "@/components/chat/chat";
+import { listUserIntegrations } from "@/lib/services/integrations";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +26,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     parts: m.parts,
   })) as unknown as UIMessage[];
   const interruptedMessageIds = got.messages.filter((message) => message.status === "interrupted").map((message) => message.id);
-  return <Chat conversationId={id} initialMessages={initialMessages} interruptedMessageIds={interruptedMessageIds} assistantName={assistant?.name} />;
+  const integrationNames = (await listUserIntegrations(db, session.user.id)).filter((item) => item.connected).map((item) => item.name);
+  return <Chat conversationId={id} initialMessages={initialMessages} interruptedMessageIds={interruptedMessageIds} assistantName={assistant?.name} integrationNames={integrationNames} />;
 }
