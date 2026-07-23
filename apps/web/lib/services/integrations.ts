@@ -132,7 +132,7 @@ export async function disconnectIntegration(db: Db, userId: string, provider: In
   await db.delete(integrationConnections).where(and(eq(integrationConnections.userId, userId), eq(integrationConnections.provider, provider)));
 }
 
-export async function createOauthState(db: Db, userId: string, provider: Exclude<IntegrationProvider, "apify">, redirectUri: string) {
+export async function createOauthState(db: Db, userId: string, provider: Exclude<IntegrationProvider, "apify" | "gitbook">, redirectUri: string) {
   const state = randomBytes(32).toString("base64url");
   await db.insert(integrationOauthStates).values({ tokenHash: hashState(state), userId, provider, redirectUri, expiresAt: new Date(Date.now() + 10 * 60_000) });
   return state;

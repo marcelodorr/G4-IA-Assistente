@@ -1,4 +1,4 @@
-export const INTEGRATION_PROVIDERS = ["google_calendar", "hubspot", "pipedrive", "apify", "jira"] as const;
+export const INTEGRATION_PROVIDERS = ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] as const;
 export type IntegrationProvider = typeof INTEGRATION_PROVIDERS[number];
 
 export type IntegrationDefinition = {
@@ -14,6 +14,9 @@ export type IntegrationDefinition = {
   limitations: string[];
   docsUrl: string;
   scopes?: string[];
+  tokenLabel?: string;
+  tokenPlaceholder?: string;
+  tokenHelp?: string;
 };
 
 export const INTEGRATIONS: Record<IntegrationProvider, IntegrationDefinition> = {
@@ -70,6 +73,9 @@ export const INTEGRATIONS: Record<IntegrationProvider, IntegrationDefinition> = 
     capabilities: ["Listar datasets", "Ler itens de um dataset pelo ID", "Listar Actors disponíveis", "Consultar execuções recentes"],
     examplePrompts: ["Liste meus datasets mais recentes da Apify.", "Leia os primeiros 20 itens do dataset ABC123.", "Mostre as execuções recentes dos meus Actors na Apify."],
     limitations: ["Somente leitura: não inicia nem interrompe Actors", "Para ler itens, informe o ID do dataset", "Retorna no máximo 50 itens por chamada"],
+    tokenLabel: "Token pessoal da Apify",
+    tokenPlaceholder: "apify_api_...",
+    tokenHelp: "Encontre em Apify Console → Settings → API & Integrations. O token será validado e criptografado.",
   },
   jira: {
     id: "jira",
@@ -84,6 +90,22 @@ export const INTEGRATIONS: Record<IntegrationProvider, IntegrationDefinition> = 
     examplePrompts: ["Liste os projetos que posso acessar no Jira.", "Mostre minhas issues abertas atualizadas nos últimos 7 dias.", "No Jira, liste bugs de alta prioridade do projeto MES.", "Execute a JQL: project = MES AND status != Done ORDER BY priority DESC."],
     limitations: ["Somente leitura: não cria, comenta ou muda issues", "Resultados respeitam as permissões do Jira", "Retorna no máximo 50 issues por chamada"],
     scopes: ["read:jira-work", "read:jira-user", "offline_access"],
+  },
+  gitbook: {
+    id: "gitbook",
+    name: "GitBook",
+    description: "Consulta documentação, espaços e páginas da conta GitBook.",
+    authType: "token",
+    color: "#346DDB",
+    docsUrl: "https://gitbook.com/docs/developers/gitbook-api/api-reference",
+    setupSteps: ["O administrador ativa o GitBook e libera os usuários desejados.", "Cada usuário cria um token em GitBook → Developer settings → Personal access tokens.", "O wizard valida o token antes de armazená-lo criptografado."],
+    userSteps: ["Abra as configurações de desenvolvedor da sua conta GitBook.", "Crie e copie um Personal Access Token.", "Cole o token no wizard; depois pergunte normalmente sobre a documentação no chat."],
+    capabilities: ["Listar organizações acessíveis", "Listar espaços de documentação", "Pesquisar conteúdo em uma organização", "Listar e ler páginas em Markdown"],
+    examplePrompts: ["Quais organizações e documentações eu acesso no GitBook?", "Pesquise no GitBook informações sobre implantação do MES.", "Liste as páginas do espaço ABC123 no GitBook.", "Leia no GitBook a página XYZ do espaço ABC123 e faça um resumo."],
+    limitations: ["Somente leitura: não cria nem altera páginas", "A busca precisa de uma organização acessível à conta", "Para ler uma página específica, pode ser necessário informar o ID do espaço"],
+    tokenLabel: "Personal Access Token do GitBook",
+    tokenPlaceholder: "Token pessoal do GitBook",
+    tokenHelp: "Crie em GitBook → Developer settings → Personal access tokens. O token será validado e armazenado criptografado.",
   },
 };
 

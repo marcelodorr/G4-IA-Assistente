@@ -19,7 +19,7 @@ export default async function NewChatPage({ searchParams }: { searchParams: Prom
     searchParams,
   ]);
   // Só os campos necessários para o seletor chegam ao client — nunca o systemPrompt.
-  const assistants = assistentes.map(({ id, name, description, agentType }) => ({ id, name, description, agentType }));
+  const assistants = assistentes.map(({ id, name, description, agentType, integrationProvider }) => ({ id, name, description, agentType, integrationProvider }));
   const globallyEnabled = SUPPORTED_MODELS.filter((model) => !settings.disabledModels.includes(model));
   const models = filterUserModels(globallyEnabled, access.allowedModels);
   const defaultModel = models.includes(settings.defaultModel) ? settings.defaultModel : models[0] ?? null;

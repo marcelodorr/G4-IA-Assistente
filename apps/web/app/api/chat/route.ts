@@ -29,6 +29,7 @@ import { captureCorporateMemory } from "@/lib/services/corporate-memory";
 import { createAgentTools } from "@/lib/ai/agent-tools";
 import { AGENT_TYPE_INSTRUCTIONS } from "@/lib/ai/agent-types";
 import { createIntegrationTools } from "@/lib/ai/integration-tools";
+import { INTEGRATIONS } from "@/lib/integrations/catalog";
 
 export const maxDuration = 150;
 
@@ -71,7 +72,10 @@ export const POST = apiHandler(async (req) => {
   const modelPolicy = getModelPolicy(modelId)!;
   const temBase = await hasReadyKnowledge(db, assistant?.id ?? null);
   const agentType = assistant?.agentType ?? "chat";
-  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType]].filter(Boolean).join("\n\n");
+  const integrationPrompt = assistant?.integrationProvider
+    ? `INTEGRAÇÃO PADRÃO DESTE ASSISTENTE: ${INTEGRATIONS[assistant.integrationProvider].name}. Quando a solicitação depender de dados dessa plataforma, use a ferramenta disponível automaticamente. Se a conta do usuário ainda não estiver conectada, explique como conectá-la em Minhas integrações; nunca invente dados.`
+    : null;
+  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt].filter(Boolean).join("\n\n");
   const systemPrompt = composeSystemPrompt({ globalContext, assistantPrompt, hasKnowledge: temBase });
 
   const storedNames = newMessage.parts
@@ -157,9 +161,9 @@ export const POST = apiHandler(async (req) => {
       assistantId: assistant?.id,
     }, { beforeCall: beforeAgentCall });
     let integrationCalls = 0;
-    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId }, { beforeCall: () => {
+    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId }, { providers: assistant?.integrationProvider ? [assistant.integrationProvider] : undefined, beforeCall: () => {
       integrationCalls += 1;
-      if (integrationCalls > 2) throw new Error("Limite de consultas a integrações nesta resposta atingido");
+      if (integrationCalls > 4) throw new Error("Limite de consultas a integrações nesta resposta atingido");
     } });
     const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools, ...integrationTools } : undefined;
     let failurePersistence: Promise<void> | null = null;

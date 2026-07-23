@@ -13,7 +13,7 @@ export const GET = apiHandler(async (req) => {
   if (session.user.role !== "admin" || onlyActive) {
     // Membros não podem ver o systemPrompt dos assistentes (só admins editam/usam a página admin).
     return Response.json(
-      rows.map(({ id, name, description, model, agentType, active, createdAt }) => ({ id, name, description, model, agentType, active, createdAt }))
+      rows.map(({ id, name, description, model, agentType, integrationProvider, active, createdAt }) => ({ id, name, description, model, agentType, integrationProvider, active, createdAt }))
     );
   }
   return Response.json(rows);
@@ -21,11 +21,11 @@ export const GET = apiHandler(async (req) => {
 
 export const POST = apiHandler(async (req) => {
   const session = await requireAdmin();
-  const { name, systemPrompt, description, model, agentType } = await req.json();
+  const { name, systemPrompt, description, model, agentType, integrationProvider } = await req.json();
   const settings = await getSettings(db);
   if (model && !isModelEnabled(model, settings.disabledModels)) {
     return Response.json({ error: "Modelo inválido ou desabilitado" }, { status: 400 });
   }
-  const row = await createAssistant(db, { name, systemPrompt, description, model, agentType, createdBy: session.user.id });
+  const row = await createAssistant(db, { name, systemPrompt, description, model, agentType, integrationProvider, createdBy: session.user.id });
   return Response.json(row, { status: 201 });
 });

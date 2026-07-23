@@ -26,6 +26,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     parts: m.parts,
   })) as unknown as UIMessage[];
   const interruptedMessageIds = got.messages.filter((message) => message.status === "interrupted").map((message) => message.id);
-  const integrationNames = (await listUserIntegrations(db, session.user.id)).filter((item) => item.connected).map((item) => item.name);
+  const integrationNames = (await listUserIntegrations(db, session.user.id))
+    .filter((item) => item.connected && (!assistant?.integrationProvider || item.id === assistant.integrationProvider))
+    .map((item) => item.name);
   return <Chat conversationId={id} initialMessages={initialMessages} interruptedMessageIds={interruptedMessageIds} assistantName={assistant?.name} integrationNames={integrationNames} />;
 }

@@ -86,6 +86,35 @@ async function jira(token: string, cloudId: string, input: QueryInput) {
   return fetchJson(`${base}/search/jql?${params}`, { headers });
 }
 
+function requiredGitBookId(value: unknown, label: string) {
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_-]+$/.test(value)) throw new Error(`Informe um ${label} válido`);
+  return value;
+}
+
+export async function queryGitBook(token: string, input: QueryInput) {
+  const action = String(input.action ?? "list_organizations");
+  const limit = clampLimit(input.limit);
+  const headers = { Authorization: `Bearer ${token}` };
+  if (action === "list_organizations") return fetchJson(`https://api.gitbook.com/v1/orgs?limit=${limit}`, { headers });
+  if (action === "list_spaces") {
+    const organizationId = requiredGitBookId(input.organizationId, "organizationId");
+    return fetchJson(`https://api.gitbook.com/v1/orgs/${encodeURIComponent(organizationId)}/spaces?limit=${limit}`, { headers });
+  }
+  if (action === "search") {
+    const organizationId = requiredGitBookId(input.organizationId, "organizationId");
+    if (typeof input.query !== "string" || !input.query.trim()) throw new Error("Informe o texto que deseja pesquisar no GitBook");
+    const params = new URLSearchParams({ query: input.query.trim().slice(0, 512), limit: String(limit) });
+    return fetchJson(`https://api.gitbook.com/v1/orgs/${encodeURIComponent(organizationId)}/search?${params}`, { headers });
+  }
+  const spaceId = requiredGitBookId(input.spaceId, "spaceId");
+  if (action === "list_pages") return fetchJson(`https://api.gitbook.com/v1/spaces/${encodeURIComponent(spaceId)}/content/pages`, { headers });
+  if (action === "get_page") {
+    const pageId = requiredGitBookId(input.pageId, "pageId");
+    return fetchJson(`https://api.gitbook.com/v1/spaces/${encodeURIComponent(spaceId)}/content/page/${encodeURIComponent(pageId)}?format=markdown`, { headers });
+  }
+  throw new Error("Ação GitBook inválida");
+}
+
 function compactResult(value: unknown) {
   const text = JSON.stringify(value, null, 2);
   return text.length > 30_000 ? `${text.slice(0, 30_000)}\n[resultado truncado]` : text;
@@ -107,7 +136,8 @@ export async function executeIntegrationQuery(db: Db, input: {
     else if (input.provider === "hubspot") result = await hubspot(token, input.params);
     else if (input.provider === "pipedrive") result = await pipedrive(token, String((connection.metadata as Record<string, unknown>).apiDomain ?? "https://api.pipedrive.com"), input.params);
     else if (input.provider === "apify") result = await apify(token, input.params);
-    else result = await jira(token, String((connection.metadata as Record<string, unknown>).cloudId ?? connection.externalAccountId ?? ""), input.params);
+    else if (input.provider === "jira") result = await jira(token, String((connection.metadata as Record<string, unknown>).cloudId ?? connection.externalAccountId ?? ""), input.params);
+    else result = await queryGitBook(token, input.params);
     const content = compactResult(result);
     await Promise.all([
       db.insert(integrationActivity).values({ userId: input.userId, conversationId: input.conversationId ?? null, provider: input.provider, action: input.action, requestSummary: input.params, resultContent: content, success: true }),
@@ -137,6 +167,20 @@ export async function connectApify(db: Db, userId: string, token: string) {
   void syncIntegrationSnapshot(db, userId, "apify").catch((error) => console.error("[integração] sincronização inicial Apify falhou", error));
 }
 
+export async function connectGitBook(db: Db, userId: string, token: string) {
+  const trimmed = token.trim();
+  if (trimmed.length < 20) throw new Error("Token GitBook inválido");
+  const profile = await fetchJson("https://api.gitbook.com/v1/user", { headers: { Authorization: `Bearer ${trimmed}` } }) as { id?: string; displayName?: string; email?: string };
+  await saveUserConnection(db, {
+    userId,
+    provider: "gitbook",
+    accessToken: trimmed,
+    externalAccountId: profile.id,
+    accountLabel: profile.email ?? profile.displayName ?? "GitBook conectado",
+  });
+  void syncIntegrationSnapshot(db, userId, "gitbook").catch((error) => console.error("[integração] sincronização inicial GitBook falhou", error));
+}
+
 export function syncIntegrationSnapshot(db: Db, userId: string, provider: IntegrationProvider) {
   const defaults: Record<IntegrationProvider, { action: string; params: QueryInput }> = {
     google_calendar: { action: "initial_events", params: { limit: 30 } },
@@ -144,6 +188,7 @@ export function syncIntegrationSnapshot(db: Db, userId: string, provider: Integr
     pipedrive: { action: "initial_deals", params: { resource: "deals", limit: 30 } },
     apify: { action: "initial_datasets", params: { action: "list_datasets", limit: 30 } },
     jira: { action: "initial_issues", params: { action: "search_issues", jql: "order by updated DESC", limit: 30 } },
+    gitbook: { action: "initial_organizations", params: { action: "list_organizations", limit: 30 } },
   };
   return executeIntegrationQuery(db, { userId, provider, ...defaults[provider] });
 }

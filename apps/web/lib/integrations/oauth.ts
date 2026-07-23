@@ -3,7 +3,7 @@ import type { Db } from "@/lib/db";
 import { INTEGRATIONS, type IntegrationProvider } from "./catalog";
 import { getIntegrationConfig, getUserConnection, saveUserConnection } from "@/lib/services/integrations";
 
-type OAuthProvider = Exclude<IntegrationProvider, "apify">;
+type OAuthProvider = Exclude<IntegrationProvider, "apify" | "gitbook">;
 type TokenResponse = {
   access_token: string;
   refresh_token?: string;
@@ -106,7 +106,7 @@ export async function getValidAccessToken(db: Db, userId: string, provider: Inte
   const connection = await getUserConnection(db, userId, provider);
   if (!connection || connection.status !== "connected") throw new Error(`${INTEGRATIONS[provider].name} não está conectado para este usuário`);
   if (!connection.expiresAt || connection.expiresAt.getTime() > Date.now() + 60_000) return { token: decrypt(connection.accessTokenEncrypted), connection };
-  if (provider === "apify" || !connection.refreshTokenEncrypted) throw new Error("A autorização expirou. Reconecte a integração.");
+  if (provider === "apify" || provider === "gitbook" || !connection.refreshTokenEncrypted) throw new Error("A autorização expirou. Reconecte a integração.");
   const refreshToken = decrypt(connection.refreshTokenEncrypted);
   const token = await requestOAuthToken(db, provider, { grant_type: "refresh_token", refresh_token: refreshToken }, true);
   await saveUserConnection(db, {

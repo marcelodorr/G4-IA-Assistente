@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { AssistantForm } from "@/components/admin/assistant-form";
 import { AGENT_TYPE_LABELS } from "@/lib/ai/agent-types";
+import { listIntegrationAdmin } from "@/lib/services/integrations";
+import { INTEGRATIONS } from "@/lib/integrations/catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAssistentesPage() {
-  const assistentes = await listAssistants(db, {});
+  const [assistentes, integrations] = await Promise.all([listAssistants(db, {}), listIntegrationAdmin(db)]);
+  const integrationOptions = integrations.filter((integration) => integration.active).map(({ id, name }) => ({ id, name }));
   const contagens = await db
     .select({ assistantId: assistantFiles.assistantId, total: sql<number>`count(*)::int` })
     .from(assistantFiles)
@@ -25,7 +28,7 @@ export default async function AdminAssistentesPage() {
           <h1 className="font-heading text-xl font-medium">Assistentes</h1>
           <p className="text-sm text-muted-foreground">Crie e configure os assistentes de IA disponíveis para os usuários.</p>
         </div>
-        <AssistantForm />
+        <AssistantForm integrations={integrationOptions} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {assistentes.map((assistente) => (
@@ -42,7 +45,7 @@ export default async function AdminAssistentesPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  {AGENT_TYPE_LABELS[assistente.agentType]} · {contagemPorAssistente.get(assistente.id) ?? 0} arquivo(s) na base
+                  {AGENT_TYPE_LABELS[assistente.agentType]} · {contagemPorAssistente.get(assistente.id) ?? 0} arquivo(s) na base{assistente.integrationProvider ? ` · ${INTEGRATIONS[assistente.integrationProvider].name}` : ""}
                 </p>
               </CardContent>
             </Card>

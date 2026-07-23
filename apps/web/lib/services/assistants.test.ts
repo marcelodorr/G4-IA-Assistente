@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
-import { createAssistant, updateAssistant, listAssistants, deleteAssistant } from "./assistants";
+import { createAssistant, updateAssistant, listAssistants, deleteAssistant, getAssistant } from "./assistants";
 import { users } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
@@ -15,9 +15,11 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("assistants", () => {
   it("cria, atualiza, lista e remove", async () => {
     const db = await getTestDb();
     const u = await admin(db);
-    const a = await createAssistant(db, { name: "Vendas", systemPrompt: "Você é especialista em vendas.", createdBy: u.id });
+    const a = await createAssistant(db, { name: "Vendas", systemPrompt: "Você é especialista em vendas.", integrationProvider: "gitbook", createdBy: u.id });
     expect(a.active).toBe(true);
+    expect(a.integrationProvider).toBe("gitbook");
     await updateAssistant(db, a.id, { active: false, description: "desc" });
+    expect((await getAssistant(db, a.id))?.integrationProvider).toBe("gitbook");
     expect(await listAssistants(db, { onlyActive: true })).toHaveLength(0);
     expect(await listAssistants(db, {})).toHaveLength(1);
     await deleteAssistant(db, a.id);

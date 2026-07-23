@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const { provider } = await params;
   try {
     const session = await requireSession();
-    if (!isIntegrationProvider(provider) || provider === "apify") throw new Error("Integração inválida");
+    if (!isIntegrationProvider(provider) || provider === "apify" || provider === "gitbook") throw new Error("Integração inválida");
     const url = new URL(req.url);
     const error = url.searchParams.get("error");
     if (error) throw new Error(url.searchParams.get("error_description") ?? "Autorização cancelada pelo usuário");

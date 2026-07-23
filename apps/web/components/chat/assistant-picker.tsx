@@ -2,6 +2,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AssistantSummary } from "@/lib/services/assistants";
 import { AGENT_TYPE_LABELS } from "@/lib/ai/agent-types";
+import { INTEGRATIONS } from "@/lib/integrations/catalog";
 
 // Valor sentinela do item "Chat livre" (sem assistente) no <Select>, que exige
 // strings não vazias para cada item.
@@ -28,7 +29,7 @@ export function AssistantPicker({
         <SelectItem value={CHAT_LIVRE}>Chat livre</SelectItem>
         {assistants.map((a) => (
           <SelectItem key={a.id} value={a.id}>
-            {a.name} · {AGENT_TYPE_LABELS[a.agentType]}
+            {a.name} · {AGENT_TYPE_LABELS[a.agentType]}{a.integrationProvider ? ` · ${INTEGRATIONS[a.integrationProvider].name}` : ""}
           </SelectItem>
         ))}
       </SelectContent>

@@ -13,12 +13,16 @@ import {
 import { SUPPORTED_MODELS } from "@/lib/ai/models";
 import type { getAssistant } from "@/lib/services/assistants";
 import { AGENT_PROMPT_TEMPLATES, AGENT_TYPE_LABELS, AGENT_TYPES, type AgentType } from "@/lib/ai/agent-types";
+import type { IntegrationProvider } from "@/lib/integrations/catalog";
 
 type AssistantRow = NonNullable<Awaited<ReturnType<typeof getAssistant>>>;
 
 const MODELO_PADRAO = "padrao";
+const TODAS_INTEGRACOES = "todas";
 
-export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
+type IntegrationOption = { id: IntegrationProvider; name: string };
+
+export function AssistantForm({ assistant, integrations = [] }: { assistant?: AssistantRow; integrations?: IntegrationOption[] }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [name, setName] = useState(assistant?.name ?? "");
@@ -26,13 +30,14 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
   const [systemPrompt, setSystemPrompt] = useState(assistant?.systemPrompt ?? AGENT_PROMPT_TEMPLATES.chat);
   const [model, setModel] = useState(assistant?.model ?? MODELO_PADRAO);
   const [agentType, setAgentType] = useState<AgentType>(assistant?.agentType ?? "chat");
+  const [integrationProvider, setIntegrationProvider] = useState<IntegrationProvider | typeof TODAS_INTEGRACOES>(assistant?.integrationProvider ?? TODAS_INTEGRACOES);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   function resetar(novoAberto: boolean) {
     setAberto(novoAberto);
     if (!novoAberto) {
-      setName(""); setDescription(""); setSystemPrompt(AGENT_PROMPT_TEMPLATES.chat); setModel(MODELO_PADRAO); setAgentType("chat"); setErro(null);
+      setName(""); setDescription(""); setSystemPrompt(AGENT_PROMPT_TEMPLATES.chat); setModel(MODELO_PADRAO); setAgentType("chat"); setIntegrationProvider(TODAS_INTEGRACOES); setErro(null);
     }
   }
 
@@ -44,6 +49,7 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
       systemPrompt,
       model: model === MODELO_PADRAO ? null : model,
       agentType,
+      integrationProvider: integrationProvider === TODAS_INTEGRACOES ? null : integrationProvider,
     };
     const res = assistant
       ? await fetch(`/api/assistants/${assistant.id}`, { method: "PATCH", body: JSON.stringify(body) })
@@ -111,6 +117,17 @@ export function AssistantForm({ assistant }: { assistant?: AssistantRow }) {
             {SUPPORTED_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Integração padrão</Label>
+        <Select value={integrationProvider} onValueChange={(value) => setIntegrationProvider(value as IntegrationProvider | typeof TODAS_INTEGRACOES)}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODAS_INTEGRACOES}>Todas as integrações conectadas</SelectItem>
+            {integrations.map((integration) => <SelectItem key={integration.id} value={integration.id}>{integration.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">Ao escolher uma plataforma, este assistente usará somente essa integração e a acionará automaticamente quando a pergunta precisar de dados externos. A conta continua sendo conectada por cada usuário.</p>
       </div>
       {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
       <Button
