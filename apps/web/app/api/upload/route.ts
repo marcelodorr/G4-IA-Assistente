@@ -1,9 +1,7 @@
-import { saveUpload, CHAT_MIMES, KB_MIMES } from "@/lib/files/storage";
+import { saveUpload, CHAT_MIMES } from "@/lib/files/storage";
 import { apiHandler, requireSession } from "@/lib/services/guards";
 import { db } from "@/lib/db";
-import { chatUploads, globalContextFiles } from "@/lib/db/schema";
-import { getSettings } from "@/lib/services/settings";
-import { startGlobalContextIngestion } from "@/lib/rag/ingest";
+import { chatUploads } from "@/lib/db/schema";
 import { fetchExternalSite } from "@/lib/files/external-site";
 
 export const POST = apiHandler(async (req) => {
@@ -32,26 +30,12 @@ export const POST = apiHandler(async (req) => {
     inputMime = file.type;
   }
   const { storedName, mime } = await saveUpload(buf, storageFilename, inputMime, CHAT_MIMES);
-  const [upload] = await db.insert(chatUploads).values({
+  await db.insert(chatUploads).values({
     userId: session.user.id,
     storedName,
     filename,
     mime,
     size: buf.byteLength,
-  }).returning();
-  const settings = await getSettings(db);
-  if (settings.autoLearnEnabled && KB_MIMES.includes(mime)) {
-    const [knowledgeFile] = await db.insert(globalContextFiles).values({
-      filename,
-      mime,
-      size: buf.byteLength,
-      storagePath: storedName,
-      createdBy: session.user.id,
-      sourceType: "chat_upload",
-      sourceUserId: session.user.id,
-      sourceUploadId: upload.id,
-    }).onConflictDoNothing({ target: globalContextFiles.sourceUploadId }).returning();
-    if (knowledgeFile) startGlobalContextIngestion(db, knowledgeFile.id);
-  }
+  });
   return Response.json({ url: `/api/files/${storedName}`, mediaType: mime, filename });
 });

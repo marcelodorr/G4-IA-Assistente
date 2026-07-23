@@ -123,6 +123,7 @@ function compactResult(value: unknown) {
 export async function executeIntegrationQuery(db: Db, input: {
   userId: string;
   conversationId?: string;
+  projectId?: string;
   provider: IntegrationProvider;
   action: string;
   params: QueryInput;
@@ -143,7 +144,7 @@ export async function executeIntegrationQuery(db: Db, input: {
       db.insert(integrationActivity).values({ userId: input.userId, conversationId: input.conversationId ?? null, provider: input.provider, action: input.action, requestSummary: input.params, resultContent: content, success: true }),
       db.update(integrationConnections).set({ lastUsedAt: new Date(), lastError: null, updatedAt: new Date() }).where(and(eq(integrationConnections.userId, input.userId), eq(integrationConnections.provider, input.provider))),
     ]);
-    void captureCorporateMemory(db, {
+    if (!input.projectId) void captureCorporateMemory(db, {
       userId: input.userId, conversationId: input.conversationId, sourceType: "integration", sourceProvider: input.provider,
       content: `Dados consultados em ${INTEGRATIONS[input.provider].name}. Ação: ${input.action}. Parâmetros: ${JSON.stringify(input.params)}\n${content}`,
     }).catch((error) => console.error("[integração] falha ao alimentar contexto corporativo", error));

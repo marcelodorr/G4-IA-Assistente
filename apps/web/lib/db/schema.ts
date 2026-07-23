@@ -66,6 +66,41 @@ export const userAssistantAccess = pgTable("user_assistant_access", {
   index("user_assistant_access_user_idx").on(t.userId),
 ]);
 
+export const projects = pgTable("projects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  context: text("context").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [index("projects_user_updated_idx").on(t.userId, t.updatedAt)]);
+
+export const projectFiles = pgTable("project_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  kind: text("kind", { enum: ["document", "context", "skill"] }).notNull().default("document"),
+  status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("project_files_project_idx").on(t.projectId)]);
+
+export const projectChunks = pgTable("project_chunks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileId: uuid("file_id").notNull().references(() => projectFiles.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+}, (t) => [
+  index("project_chunks_project_idx").on(t.projectId),
+  index("project_chunks_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+]);
+
 export const integrationConfigs = pgTable("integration_configs", {
   provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).primaryKey(),
   active: boolean("active").notNull().default(false),
@@ -185,6 +220,7 @@ export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
   title: text("title"),
   model: text("model"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

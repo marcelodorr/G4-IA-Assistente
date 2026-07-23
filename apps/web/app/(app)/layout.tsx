@@ -6,6 +6,7 @@ import { users } from "@/lib/db/schema";
 import { isSetupCompleted } from "@/lib/services/setup";
 import { listConversations } from "@/lib/services/conversations";
 import { Sidebar } from "@/components/sidebar/sidebar";
+import { listProjects } from "@/lib/services/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a cada navegação para não deixar um usuário desativado usar o app.
   const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
-  const convs = await listConversations(db, session.user.id);
+  const [convs, projects] = await Promise.all([listConversations(db, session.user.id), listProjects(db, session.user.id)]);
   return (
     <div className="flex h-screen">
-      <Sidebar user={session.user} conversations={convs} />
+      <Sidebar user={session.user} conversations={convs} projects={projects} />
       <main className="min-w-0 flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
     </div>
   );

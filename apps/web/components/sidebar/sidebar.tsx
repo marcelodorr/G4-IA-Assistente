@@ -7,13 +7,15 @@ import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { ConversationList } from "@/components/sidebar/conversation-list";
 import type { listConversations } from "@/lib/services/conversations";
+import type { listProjects } from "@/lib/services/projects";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
-type Props = { user: Session["user"]; conversations: ConversationRow[] };
+type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
+type Props = { user: Session["user"]; conversations: ConversationRow[]; projects: ProjectRow[] };
 
-function SidebarContent({ user, conversations }: Props) {
-  return <><div className="p-4"><Logo className="h-6 w-auto" /></div><div className="px-3 pb-2"><Button asChild className="w-full"><Link href="/">Nova conversa</Link></Button></div><ConversationList conversations={conversations} user={user} /></>;
+function SidebarContent({ user, conversations, projects }: Props) {
+  return <><div className="p-4"><Logo className="h-6 w-auto" /></div><div className="space-y-2 px-3 pb-2"><Button asChild className="w-full"><Link href="/">Nova conversa</Link></Button><Button asChild variant="outline" className="w-full"><Link href="/projetos">Projetos</Link></Button></div><ConversationList conversations={conversations} projects={projects} user={user} /></>;
 }
 
 export function Sidebar(props: Props) {

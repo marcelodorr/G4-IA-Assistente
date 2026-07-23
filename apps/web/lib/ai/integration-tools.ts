@@ -5,7 +5,7 @@ import { executeIntegrationQuery } from "@/lib/integrations/client";
 import { listUserIntegrations } from "@/lib/services/integrations";
 import type { IntegrationProvider } from "@/lib/integrations/catalog";
 
-type Owner = { userId: string; conversationId: string };
+type Owner = { userId: string; conversationId: string; projectId?: string };
 
 export async function createIntegrationTools(db: Db, owner: Owner, options?: { beforeCall?: () => void; providers?: IntegrationProvider[] }): Promise<ToolSet> {
   const integrations = await listUserIntegrations(db, owner.userId);

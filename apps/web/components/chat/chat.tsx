@@ -7,18 +7,25 @@ import { toast } from "sonner";
 import { MessageList } from "./message-list";
 import { MessageInput, type Attachment } from "./message-input";
 import Link from "next/link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const SEM_PROJETO = "__sem_projeto__";
 
 export function Chat({
   conversationId,
   initialMessages,
   interruptedMessageIds,
   assistantName,
+  project,
+  projects = [],
   integrationNames = [],
 }: {
   conversationId: string;
   initialMessages: UIMessage[];
   interruptedMessageIds: string[];
   assistantName?: string | null;
+  project?: { id: string; name: string } | null;
+  projects?: Array<{ id: string; name: string }>;
   integrationNames?: string[];
 }) {
   const router = useRouter();
@@ -64,8 +71,16 @@ export function Chat({
     sendMessage({ text, files: files.length ? files : undefined });
   }
 
+  async function moveToProject(projectId: string | null) {
+    const response = await fetch(`/api/conversations/${conversationId}`, { method: "PATCH", body: JSON.stringify({ projectId }) });
+    if (!response.ok) return toast.error((await response.json()).error ?? "Não foi possível mover a conversa");
+    toast.success(projectId ? "Conversa movida para o projeto" : "Conversa removida do projeto");
+    router.refresh();
+  }
+
   return (
     <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2 text-sm text-muted-foreground"><span className="shrink-0">Projeto:</span><Select disabled={status === "streaming" || status === "submitted"} value={project?.id ?? SEM_PROJETO} onValueChange={(value) => void moveToProject(value === SEM_PROJETO ? null : value)}><SelectTrigger className="h-8 max-w-64 bg-background" aria-label="Mover conversa para projeto"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={SEM_PROJETO}>Sem projeto</SelectItem>{projects.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>{project && <><span className="hidden sm:inline">contexto persistente ativo</span><Link href={`/projetos/${project.id}`} className="text-primary hover:underline">Configurar</Link></>}</div>
       {assistantName && (
         <div className="border-b px-4 py-2 text-sm text-muted-foreground">
           Assistente: <span className="text-primary">{assistantName}</span>

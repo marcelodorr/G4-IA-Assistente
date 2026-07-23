@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { embedMany, generateText } from "ai";
-import { assistantFiles, assistants, chunks, globalContextChunks, globalContextFiles } from "@/lib/db/schema";
+import { assistantFiles, assistants, chunks, globalContextChunks, globalContextFiles, projectChunks, projectFiles, projects } from "@/lib/db/schema";
 import { readUpload } from "@/lib/files/storage";
 import { rasterizeSvg } from "@/lib/files/image";
 import { extractTextFromFile } from "./extract";
@@ -131,5 +131,54 @@ export function startGlobalContextIngestion(db: Db, fileId: string) {
   };
   void ingestGlobalContextFile(db, fileId, { embed: realEmbed, extract: (buf, mime) => extractKnowledgeText(db, buf, mime) }).catch((error) => {
     console.error(`[contexto-global] falha no arquivo ${fileId}:`, error);
+  });
+}
+
+export async function ingestProjectFile(db: Db, fileId: string, deps: Deps) {
+  const [file] = await db.select().from(projectFiles).where(eq(projectFiles.id, fileId));
+  if (!file) throw new Error("Arquivo do projeto não encontrado");
+  await db.update(projectFiles).set({ status: "processing", error: null }).where(eq(projectFiles.id, fileId));
+  try {
+    const { buf } = await readUpload(file.storagePath);
+    const text = await (deps.extract ?? extractTextFromFile)(buf, file.mime);
+    const parts = chunkText(text);
+    if (parts.length === 0) throw new Error("Nenhum texto extraído do arquivo");
+    await db.delete(projectChunks).where(eq(projectChunks.fileId, fileId));
+    for (let i = 0; i < parts.length; i += 100) {
+      const batch = parts.slice(i, i + 100);
+      const embeddings = await deps.embed(batch);
+      await db.insert(projectChunks).values(batch.map((content, index) => ({
+        fileId,
+        projectId: file.projectId,
+        content,
+        chunkIndex: i + index,
+        embedding: embeddings[index],
+      })));
+    }
+    await db.update(projectFiles).set({ status: "ready" }).where(eq(projectFiles.id, fileId));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await db.update(projectFiles).set({ status: "error", error: message }).where(eq(projectFiles.id, fileId));
+  }
+}
+
+export function startProjectFileIngestion(db: Db, fileId: string) {
+  const realEmbed = async (texts: string[]) => {
+    const openai = await getProvider(db);
+    const startedAt = Date.now();
+    const [owner] = await db.select({ userId: projects.userId }).from(projectFiles)
+      .innerJoin(projects, eq(projectFiles.projectId, projects.id))
+      .where(eq(projectFiles.id, fileId));
+    try {
+      const { embeddings, usage } = await embedMany({ model: openai.textEmbeddingModel("text-embedding-3-small"), values: texts });
+      if (owner?.userId) await recordEmbeddingUsage(db, { userId: owner.userId, tokens: usage.tokens, durationMs: Date.now() - startedAt, success: true });
+      return embeddings;
+    } catch (error) {
+      if (owner?.userId) await recordEmbeddingUsage(db, { userId: owner.userId, tokens: 0, durationMs: Date.now() - startedAt, success: false });
+      throw error;
+    }
+  };
+  void ingestProjectFile(db, fileId, { embed: realEmbed, extract: (buf, mime) => extractKnowledgeText(db, buf, mime) }).catch((error) => {
+    console.error(`[projeto] falha ao processar arquivo ${fileId}:`, error);
   });
 }

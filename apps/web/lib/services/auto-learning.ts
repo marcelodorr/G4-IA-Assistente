@@ -14,8 +14,9 @@ function messageText(parts: unknown) {
 
 export async function backfillCorporateKnowledge(db: Db) {
   const uploads = await db.select({ upload: chatUploads }).from(chatUploads)
+    .leftJoin(conversations, eq(chatUploads.conversationId, conversations.id))
     .leftJoin(globalContextFiles, eq(globalContextFiles.sourceUploadId, chatUploads.id))
-    .where(and(isNull(globalContextFiles.id), inArray(chatUploads.mime, KB_MIMES))).limit(50);
+    .where(and(isNull(globalContextFiles.id), isNull(conversations.projectId), inArray(chatUploads.mime, KB_MIMES))).limit(50);
   let filesQueued = 0;
   for (const { upload } of uploads) {
     const [file] = await db.insert(globalContextFiles).values({
@@ -40,7 +41,7 @@ export async function backfillCorporateKnowledge(db: Db) {
   }).from(messages)
     .innerJoin(conversations, eq(messages.conversationId, conversations.id))
     .leftJoin(corporateMemories, eq(corporateMemories.messageId, messages.id))
-    .where(and(eq(messages.role, "user"), isNull(corporateMemories.id))).limit(100);
+    .where(and(eq(messages.role, "user"), isNull(corporateMemories.id), isNull(conversations.projectId))).limit(100);
   let memoriesQueued = 0;
   for (const message of historicalMessages) {
     const content = messageText(message.parts);

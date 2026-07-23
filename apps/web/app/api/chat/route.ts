@@ -30,6 +30,9 @@ import { createAgentTools } from "@/lib/ai/agent-tools";
 import { AGENT_TYPE_INSTRUCTIONS } from "@/lib/ai/agent-types";
 import { createIntegrationTools } from "@/lib/ai/integration-tools";
 import { INTEGRATIONS } from "@/lib/integrations/catalog";
+import { getPersistentProjectFileContext, getProject } from "@/lib/services/projects";
+import { KB_MIMES } from "@/lib/files/storage";
+import { startGlobalContextIngestion } from "@/lib/rag/ingest";
 
 export const maxDuration = 150;
 
@@ -60,6 +63,9 @@ export const POST = apiHandler(async (req) => {
   const assistant = got.conversation.assistantId
     ? (await db.select().from(assistants).where(eq(assistants.id, got.conversation.assistantId)))[0]
     : null;
+  const project = got.conversation.projectId ? await getProject(db, got.conversation.projectId, session.user.id) : null;
+  if (got.conversation.projectId && !project) return Response.json({ error: "Este projeto não está mais disponível." }, { status: 403 });
+  const projectFilesContext = project ? await getPersistentProjectFileContext(db, project.id) : "";
   const modelId = got.conversation.model ?? assistant?.model ?? settings.defaultModel;
   const globallyEnabled = SUPPORTED_MODELS.filter((model) => isModelEnabled(model, settings.disabledModels));
   const userModels = filterUserModels(globallyEnabled, userAccess.allowedModels);
@@ -70,19 +76,25 @@ export const POST = apiHandler(async (req) => {
     return Response.json({ error: "Este assistente não está mais liberado para seu usuário." }, { status: 403 });
   }
   const modelPolicy = getModelPolicy(modelId)!;
-  const temBase = await hasReadyKnowledge(db, assistant?.id ?? null);
+  const temBase = await hasReadyKnowledge(db, assistant?.id ?? null, project?.id ?? null);
   const agentType = assistant?.agentType ?? "chat";
   const integrationPrompt = assistant?.integrationProvider
     ? `INTEGRAÇÃO PADRÃO DESTE ASSISTENTE: ${INTEGRATIONS[assistant.integrationProvider].name}. Quando a solicitação depender de dados dessa plataforma, use a ferramenta disponível automaticamente. Se a conta do usuário ainda não estiver conectada, explique como conectá-la em Minhas integrações; nunca invente dados.`
     : null;
   const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt].filter(Boolean).join("\n\n");
-  const systemPrompt = composeSystemPrompt({ globalContext, assistantPrompt, hasKnowledge: temBase });
+  const systemPrompt = composeSystemPrompt({
+    globalContext,
+    projectContext: project?.context,
+    projectFilesContext,
+    assistantPrompt,
+    hasKnowledge: temBase,
+  });
 
   const storedNames = newMessage.parts
     .filter((part) => part.type === "file")
     .map((part) => part.url.slice("/api/files/".length));
   if (storedNames.length > 0) {
-    const owned = await db.select({ id: chatUploads.id, storedName: chatUploads.storedName }).from(chatUploads).where(and(
+    const owned = await db.select().from(chatUploads).where(and(
       eq(chatUploads.userId, session.user.id),
     ));
     const ownedNames = new Set(owned.map((item) => item.storedName));
@@ -92,6 +104,22 @@ export const POST = apiHandler(async (req) => {
       db.update(chatUploads).set({ conversationId: body.conversationId }).where(inArray(chatUploads.id, uploadIds)),
       db.update(globalContextFiles).set({ sourceConversationId: body.conversationId }).where(inArray(globalContextFiles.sourceUploadId, uploadIds)),
     ]);
+    if (settings.autoLearnEnabled && !project) {
+      for (const upload of owned.filter((item) => uploadIds.includes(item.id) && KB_MIMES.includes(item.mime))) {
+        const [knowledgeFile] = await db.insert(globalContextFiles).values({
+          filename: upload.filename,
+          mime: upload.mime,
+          size: upload.size,
+          storagePath: upload.storedName,
+          createdBy: session.user.id,
+          sourceType: "chat_upload",
+          sourceUserId: session.user.id,
+          sourceConversationId: body.conversationId,
+          sourceUploadId: upload.id,
+        }).onConflictDoNothing({ target: globalContextFiles.sourceUploadId }).returning();
+        if (knowledgeFile) startGlobalContextIngestion(db, knowledgeFile.id);
+      }
+    }
   }
 
   const turn = await appendChatTurn(db, {
@@ -99,7 +127,7 @@ export const POST = apiHandler(async (req) => {
     clientId: newMessage.id,
     userParts: newMessage.parts,
   });
-  if (settings.autoLearnEnabled) {
+  if (settings.autoLearnEnabled && !project) {
     const memoryContent = newMessage.parts.filter(isTextUIPart).map((part) => part.text).join("\n");
     if (memoryContent.trim()) void captureCorporateMemory(db, {
       userId: session.user.id,
@@ -144,7 +172,7 @@ export const POST = apiHandler(async (req) => {
       if (agentCalls > 1) throw new Error("Uma geração já foi iniciada nesta resposta");
     };
     const knowledgeTools: ToolSet = temBase ? {
-      buscarConhecimento: makeKnowledgeTool(db, openai, assistant?.id ?? null, {
+      buscarConhecimento: makeKnowledgeTool(db, openai, assistant?.id ?? null, project?.id ?? null, {
         beforeCall: () => {
           beforeKnowledgeCall();
         },
@@ -161,7 +189,7 @@ export const POST = apiHandler(async (req) => {
       assistantId: assistant?.id,
     }, { beforeCall: beforeAgentCall });
     let integrationCalls = 0;
-    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId }, { providers: assistant?.integrationProvider ? [assistant.integrationProvider] : undefined, beforeCall: () => {
+    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId, projectId: project?.id }, { providers: assistant?.integrationProvider ? [assistant.integrationProvider] : undefined, beforeCall: () => {
       integrationCalls += 1;
       if (integrationCalls > 4) throw new Error("Limite de consultas a integrações nesta resposta atingido");
     } });

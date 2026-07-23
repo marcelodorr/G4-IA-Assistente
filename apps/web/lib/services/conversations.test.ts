@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { appendChatTurn, createConversation, deleteConversation, finishAssistantMessage, getConversation, listConversations } from "./conversations";
-import { users } from "@/lib/db/schema";
+import { projects, users } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
 async function makeUser(db: Db, email = "u@sequor.com.br") {
@@ -15,7 +15,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("conversations", () => {
   it("cria, lista e lê conversa com mensagens", async () => {
     const db = await getTestDb();
     const u = await makeUser(db);
-    const conv = await createConversation(db, { userId: u.id });
+    const [project] = await db.insert(projects).values({ userId: u.id, name: "Projeto" }).returning();
+    const conv = await createConversation(db, { userId: u.id, projectId: project.id });
+    expect(conv.projectId).toBe(project.id);
     const turn = await appendChatTurn(db, { conversationId: conv.id, clientId: "client-1", userParts: [{ type: "text", text: "Oi" }] });
     await finishAssistantMessage(db, turn.assistantMessage.id, { parts: [{ type: "text", text: "Olá!" }], status: "completed" });
     const got = await getConversation(db, conv.id, u.id);

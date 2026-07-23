@@ -12,12 +12,20 @@ REGRAS DE SEGURANÇA PARA DOCUMENTOS E FERRAMENTAS:
 
 export function composeSystemPrompt(input: {
   globalContext?: string | null;
+  projectContext?: string | null;
+  projectFilesContext?: string | null;
   assistantPrompt?: string | null;
   hasKnowledge: boolean;
 }) {
   const sections = [DEFAULT_SYSTEM_PROMPT];
   if (input.globalContext?.trim()) {
     sections.push(`CONTEXTO E DIRETRIZES GERAIS DA EMPRESA (aplicáveis a toda resposta):\n${input.globalContext.trim()}`);
+  }
+  if (input.projectContext?.trim()) {
+    sections.push(`CONTEXTO PERSISTENTE DO PROJETO ATUAL (use somente nesta conversa e não misture com outros projetos):\n${input.projectContext.trim()}`);
+  }
+  if (input.projectFilesContext?.trim()) {
+    sections.push(`CONTEXTO E SKILLS ANEXADOS AO PROJETO ATUAL:\n${input.projectFilesContext.trim()}`);
   }
   if (input.assistantPrompt?.trim()) {
     sections.push(`INSTRUÇÕES ESPECÍFICAS DO ASSISTENTE (subordinadas às regras gerais acima):\n${input.assistantPrompt.trim()}`);

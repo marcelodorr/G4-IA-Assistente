@@ -10,14 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { listConversations } from "@/lib/services/conversations";
+import type { listProjects } from "@/lib/services/projects";
 
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
+type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 
 export function ConversationList({
   conversations,
+  projects,
   user,
 }: {
   conversations: ConversationRow[];
+  projects: ProjectRow[];
   user: Session["user"];
 }) {
   const pathname = usePathname();
@@ -29,6 +33,7 @@ export function ConversationList({
   const filtradas = conversations.filter((conv) =>
     (conv.title ?? "Nova conversa").toLowerCase().includes(busca.toLowerCase())
   );
+  const withoutProject = filtradas.filter((conversation) => !conversation.projectId);
 
   async function excluir(id: string) {
     setExcluindoId(id);
@@ -53,6 +58,12 @@ export function ConversationList({
     }
   }
 
+  function conversationItem(conv: ConversationRow) {
+    const href = `/c/${conv.id}`;
+    const ativa = pathname === href;
+    return <div key={conv.id} className="group/conversation relative"><Link href={href} className={cn("block truncate rounded-lg px-2.5 py-1.5 pr-7 text-sm transition-colors", ativa ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>{conv.title || "Nova conversa"}</Link><button type="button" onClick={() => excluir(conv.id)} disabled={excluindoId === conv.id} aria-label="Excluir conversa" className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-destructive focus:block group-hover/conversation:block group-focus-within/conversation:block"><Trash2 className="size-3.5" /></button></div>;
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="px-3 pb-2">
@@ -64,34 +75,12 @@ export function ConversationList({
         />
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-1">
-        {filtradas.map((conv) => {
-          const href = `/c/${conv.id}`;
-          const ativa = pathname === href;
-          return (
-            <div key={conv.id} className="group/conversation relative">
-              <Link
-                href={href}
-                className={cn(
-                  "block truncate rounded-lg px-2.5 py-1.5 pr-7 text-sm transition-colors",
-                  ativa
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                {conv.title || "Nova conversa"}
-              </Link>
-              <button
-                type="button"
-                onClick={() => excluir(conv.id)}
-                disabled={excluindoId === conv.id}
-                aria-label="Excluir conversa"
-                className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-destructive focus:block group-hover/conversation:block group-focus-within/conversation:block"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </div>
-          );
+        {projects.map((project) => {
+          const projectConversations = filtradas.filter((conversation) => conversation.projectId === project.id);
+          if (projectConversations.length === 0 && busca) return null;
+          return <section key={project.id} className="pb-2"><div className="flex items-center justify-between px-2.5 py-1"><Link href={`/projetos/${project.id}`} className="truncate text-xs font-medium text-foreground hover:text-primary">{project.name}</Link><Link href={`/?project=${project.id}`} className="text-xs text-muted-foreground hover:text-primary" aria-label={`Nova conversa em ${project.name}`}>+</Link></div>{projectConversations.map(conversationItem)}{projectConversations.length === 0 && <p className="px-2.5 py-1 text-xs text-muted-foreground">Sem conversas</p>}</section>;
         })}
+        {withoutProject.length > 0 && <section><p className="px-2.5 py-1 text-xs font-medium text-muted-foreground">Conversas avulsas</p>{withoutProject.map(conversationItem)}</section>}
         {filtradas.length === 0 && (
           <p className="px-2.5 py-2 text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
         )}

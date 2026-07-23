@@ -8,13 +8,14 @@ export function makeKnowledgeTool(
   db: Db,
   openai: ReturnType<typeof createOpenAI>,
   assistantId: string | null,
+  projectId: string | null,
   options?: {
     onEmbeddingUsage?: (usage: { tokens: number; durationMs: number; success: boolean }) => Promise<void>;
     beforeCall?: () => void;
   },
 ) {
   return tool({
-    description: "Busca trechos relevantes no contexto corporativo geral e na base deste assistente. Use sempre que a pergunta puder depender de políticas, processos, dados ou documentos da empresa.",
+    description: "Busca trechos relevantes no projeto atual, no contexto corporativo geral e na base deste assistente. Use sempre que a pergunta puder depender de políticas, processos, dados ou documentos disponíveis.",
     inputSchema: z.object({
       consulta: z.string().describe("Pergunta ou termos de busca em português"),
     }),
@@ -33,7 +34,7 @@ export function makeKnowledgeTool(
         await options?.onEmbeddingUsage?.({ tokens: 0, durationMs: Date.now() - startedAt, success: false });
         throw error;
       }
-      const resultados = await searchKnowledge(db, assistantId, embedding);
+      const resultados = await searchKnowledge(db, assistantId, projectId, embedding);
       if (resultados.length === 0) return "Nenhum trecho relevante encontrado na base de conhecimento.";
       return resultados.map((r, i) =>
         `[${i + 1}] Fonte: ${r.filename}\n<documento_nao_confiavel>\n${r.content}\n</documento_nao_confiavel>`,

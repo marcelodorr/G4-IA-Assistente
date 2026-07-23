@@ -2,9 +2,9 @@ import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { conversations, messages } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 
-export async function createConversation(db: Db, input: { userId: string; assistantId?: string | null; model?: string | null }) {
+export async function createConversation(db: Db, input: { userId: string; assistantId?: string | null; projectId?: string | null; model?: string | null }) {
   const [row] = await db.insert(conversations).values({
-    userId: input.userId, assistantId: input.assistantId ?? null, model: input.model ?? null,
+    userId: input.userId, assistantId: input.assistantId ?? null, projectId: input.projectId ?? null, model: input.model ?? null,
   }).returning();
   return row;
 }
