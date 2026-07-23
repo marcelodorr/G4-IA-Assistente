@@ -65,6 +65,70 @@ export const userAssistantAccess = pgTable("user_assistant_access", {
   index("user_assistant_access_user_idx").on(t.userId),
 ]);
 
+export const integrationConfigs = pgTable("integration_configs", {
+  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira"] }).primaryKey(),
+  active: boolean("active").notNull().default(false),
+  clientId: text("client_id"),
+  clientSecretEncrypted: text("client_secret_encrypted"),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userIntegrationAccess = pgTable("user_integration_access", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira"] }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.provider] }),
+  index("user_integration_access_user_idx").on(t.userId),
+]);
+
+export const integrationConnections = pgTable("integration_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira"] }).notNull(),
+  status: text("status", { enum: ["connected", "error", "revoked"] }).notNull().default("connected"),
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  refreshTokenEncrypted: text("refresh_token_encrypted"),
+  expiresAt: timestamp("expires_at"),
+  scopes: text("scopes"),
+  externalAccountId: text("external_account_id"),
+  accountLabel: text("account_label"),
+  metadata: jsonb("metadata").notNull().default({}),
+  lastUsedAt: timestamp("last_used_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("integration_connections_user_provider_idx").on(t.userId, t.provider),
+  index("integration_connections_status_idx").on(t.status),
+]);
+
+export const integrationOauthStates = pgTable("integration_oauth_states", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "jira"] }).notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("integration_oauth_states_expires_idx").on(t.expiresAt)]);
+
+export const integrationActivity = pgTable("integration_activity", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira"] }).notNull(),
+  action: text("action").notNull(),
+  requestSummary: jsonb("request_summary").notNull().default({}),
+  resultContent: text("result_content"),
+  success: boolean("success").notNull(),
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("integration_activity_user_created_idx").on(t.userId, t.createdAt),
+  index("integration_activity_provider_created_idx").on(t.provider, t.createdAt),
+]);
+
 export const assistantFiles = pgTable("assistant_files", {
   id: uuid("id").primaryKey().defaultRandom(),
   assistantId: uuid("assistant_id").notNull().references(() => assistants.id, { onDelete: "cascade" }),
@@ -158,6 +222,8 @@ export const corporateMemories = pgTable("corporate_memories", {
   conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   messageId: uuid("message_id").references(() => messages.id, { onDelete: "set null" }).unique(),
   content: text("content").notNull(),
+  sourceType: text("source_type", { enum: ["chat", "integration"] }).notNull().default("chat"),
+  sourceProvider: text("source_provider"),
   status: text("status", { enum: ["pending", "processing", "ready", "error"] }).notNull().default("pending"),
   error: text("error"),
   embedding: vector("embedding", { dimensions: 1536 }),

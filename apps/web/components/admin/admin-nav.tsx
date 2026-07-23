@@ -7,6 +7,7 @@ const ABAS = [
   { href: "/admin/usuarios", label: "Usuários" },
   { href: "/admin/assistentes", label: "Assistentes" },
   { href: "/admin/contexto", label: "Contexto geral" },
+  { href: "/admin/integracoes", label: "Integrações" },
   { href: "/admin/uso", label: "Uso de IA" },
   { href: "/admin/saude", label: "Saúde" },
   { href: "/admin/configuracoes", label: "Configurações" },

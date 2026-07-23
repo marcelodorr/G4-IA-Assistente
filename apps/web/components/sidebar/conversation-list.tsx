@@ -99,6 +99,7 @@ export function ConversationList({
       <div className="space-y-2 border-t p-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{user.name}</p>
+          <Link href="/integracoes" className="mr-3 text-xs text-muted-foreground hover:text-foreground">Integrações</Link>
           {user.role === "admin" && (
             <Link
               href="/admin/usuarios"

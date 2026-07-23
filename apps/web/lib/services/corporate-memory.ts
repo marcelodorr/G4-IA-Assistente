@@ -22,7 +22,14 @@ export async function processCorporateMemory(db: Db, id: string) {
   }
 }
 
-export async function captureCorporateMemory(db: Db, input: { userId: string; conversationId: string; messageId: string; content: string }) {
+export async function captureCorporateMemory(db: Db, input: {
+  userId: string;
+  conversationId?: string;
+  messageId?: string;
+  content: string;
+  sourceType?: "chat" | "integration";
+  sourceProvider?: string;
+}) {
   const content = input.content.trim().slice(0, 20_000);
   if (content.length < 3) return null;
   const [row] = await db.insert(corporateMemories).values({ ...input, content })
@@ -36,6 +43,8 @@ export async function listCorporateMemories(db: Db, limit = 100) {
   return db.select({
     id: corporateMemories.id,
     content: corporateMemories.content,
+    sourceType: corporateMemories.sourceType,
+    sourceProvider: corporateMemories.sourceProvider,
     status: corporateMemories.status,
     error: corporateMemories.error,
     conversationId: corporateMemories.conversationId,

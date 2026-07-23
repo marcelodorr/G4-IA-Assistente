@@ -24,5 +24,5 @@ export async function getTestDb() {
 
 export async function truncateAll() {
   const db = await getTestDb();
-  await db.execute(sql`TRUNCATE ai_usage, chat_uploads, users, invites, settings, assistants, assistant_files, chunks, conversations, messages CASCADE`);
+  await db.execute(sql`TRUNCATE integration_activity, integration_connections, integration_oauth_states, user_integration_access, integration_configs, ai_usage, artifact_jobs, artifacts, corporate_memories, global_context_chunks, global_context_files, chat_uploads, users, invites, settings, assistants, assistant_files, chunks, conversations, messages CASCADE`);
 }

@@ -5,7 +5,7 @@ export const CHAT_LIMITS = {
   maxAttachments: 4,
   maxHistoryMessages: 30,
   maxContextChars: 100_000,
-  maxToolCalls: 3,
+  maxToolCalls: 5,
   totalTimeoutMs: 145_000,
 } as const;
 

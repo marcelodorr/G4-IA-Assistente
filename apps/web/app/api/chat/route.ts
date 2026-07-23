@@ -28,6 +28,7 @@ import { getGlobalContext } from "@/lib/services/global-context";
 import { captureCorporateMemory } from "@/lib/services/corporate-memory";
 import { createAgentTools } from "@/lib/ai/agent-tools";
 import { AGENT_TYPE_INSTRUCTIONS } from "@/lib/ai/agent-types";
+import { createIntegrationTools } from "@/lib/ai/integration-tools";
 
 export const maxDuration = 150;
 
@@ -155,7 +156,12 @@ export const POST = apiHandler(async (req) => {
       conversationId: body.conversationId,
       assistantId: assistant?.id,
     }, { beforeCall: beforeAgentCall });
-    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools } : undefined;
+    let integrationCalls = 0;
+    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId }, { beforeCall: () => {
+      integrationCalls += 1;
+      if (integrationCalls > 2) throw new Error("Limite de consultas a integrações nesta resposta atingido");
+    } });
+    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools, ...integrationTools } : undefined;
     let failurePersistence: Promise<void> | null = null;
     const markInterrupted = (reason: string) => {
       failurePersistence ??= (async () => {

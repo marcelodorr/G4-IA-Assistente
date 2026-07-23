@@ -34,6 +34,8 @@ export type CorporateMemory = {
   userId: string | null;
   userName: string | null;
   userEmail: string | null;
+  sourceType: "chat" | "integration";
+  sourceProvider: string | null;
   createdAt: string;
 };
 
@@ -186,7 +188,7 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
         <CardContent><div className="max-h-[34rem] overflow-auto rounded-md border"><Table>
           <TableHeader><TableRow><TableHead>Informação</TableHead><TableHead>Autor</TableHead><TableHead>Status</TableHead><TableHead>Data</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>{memories.map((memory) => <TableRow key={memory.id}>
-            <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{memory.content}</p>{memory.conversationId && <span className="text-xs text-muted-foreground">Conversa {memory.conversationId.slice(0, 8)}</span>}</TableCell>
+            <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{memory.content}</p><span className="text-xs text-muted-foreground">{memory.sourceType === "integration" ? `Integração: ${memory.sourceProvider ?? "externa"}` : memory.conversationId ? `Conversa ${memory.conversationId.slice(0, 8)}` : "Conversa"}</span></TableCell>
             <TableCell><div>{memory.userName ?? "Usuário removido"}</div><div className="text-xs text-muted-foreground">{memory.userEmail}</div></TableCell>
             <TableCell><Badge variant={memory.status === "error" ? "destructive" : memory.status === "ready" ? "default" : "secondary"}>{memory.status === "ready" ? "Pronta" : memory.status === "error" ? "Erro" : "Processando"}</Badge></TableCell>
             <TableCell className="whitespace-nowrap text-xs">{new Date(memory.createdAt).toLocaleString("pt-BR")}</TableCell>

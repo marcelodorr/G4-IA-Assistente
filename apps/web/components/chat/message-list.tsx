@@ -59,6 +59,11 @@ function ToolChip({ part }: { part: MessagePart }) {
     gerarOrcamento: "Gerando orçamento",
     gerarApresentacao: "Gerando apresentação",
     gerarDocumento: "Gerando documento",
+    consultarGoogleCalendar: "Consultando Google Calendar",
+    consultarHubSpot: "Consultando HubSpot",
+    consultarPipedrive: "Consultando Pipedrive",
+    consultarApify: "Consultando Apify",
+    consultarJira: "Consultando Jira",
   };
   if (statusUrl && done && !failed) return <ArtifactJobChip statusUrl={statusUrl} />;
   if (downloadUrl && done && !failed) return <a className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:underline" href={downloadUrl}>↓ Baixar {filename}</a>;

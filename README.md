@@ -29,6 +29,8 @@ O controle de histórico, streaming, cotas, custos e modelos da IA está documen
 
 O painel de saúde, a gestão completa de contas e as melhorias de acessibilidade estão documentados em **[docs/melhorias-de-produto.md](docs/melhorias-de-produto.md)**.
 
+As integrações com Google Calendar, HubSpot, Pipedrive, Apify e Jira estão documentadas em **[docs/integracoes.md](docs/integracoes.md)**.
+
 ## Licença
 
 MIT.
