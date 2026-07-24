@@ -8,6 +8,7 @@ import { ModelPicker } from "./model-picker";
 import { MessageInput, type Attachment } from "./message-input";
 import type { AssistantSummary } from "@/lib/services/assistants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { ChatControls, IntegrationOption, SkillOption } from "./chat-capability-selectors";
 
 const SEM_PROJETO = "__sem_projeto__";
 
@@ -19,6 +20,8 @@ export function NewChat({
   models,
   initialPrompt = "",
   integrationSuggestions = [],
+  integrationOptions = [],
+  projectSkills = [],
 }: {
   assistants: AssistantSummary[];
   projects: Array<{ id: string; name: string }>;
@@ -27,6 +30,8 @@ export function NewChat({
   models: string[];
   initialPrompt?: string;
   integrationSuggestions?: string[];
+  integrationOptions?: IntegrationOption[];
+  projectSkills?: Array<SkillOption & { projectId: string }>;
 }) {
   const router = useRouter();
   const [assistantId, setAssistantId] = useState<string | null>(null);
@@ -34,7 +39,7 @@ export function NewChat({
   const [model, setModel] = useState(defaultModel ?? "");
   const [criando, setCriando] = useState(false);
 
-  async function onSend(text: string, files: Attachment[]) {
+  async function onSend(text: string, files: Attachment[], controls: ChatControls) {
     if (criando) return;
     if (!model) return toast.error("Nenhum modelo de IA está liberado para seu usuário");
     setCriando(true);
@@ -51,7 +56,7 @@ export function NewChat({
         return;
       }
       const conv = await res.json();
-      sessionStorage.setItem(`draft:${conv.id}`, JSON.stringify({ text, files }));
+      sessionStorage.setItem(`draft:${conv.id}`, JSON.stringify({ text, files, controls }));
       router.push(`/c/${conv.id}`);
     } catch {
       toast.error("Erro ao criar conversa");
@@ -74,7 +79,7 @@ export function NewChat({
         </div>
         {projectId && <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-muted-foreground"><span className="font-medium text-foreground">Contexto do projeto ativo.</span> Este chat usará automaticamente o contexto, documentos e skills configurados no projeto.</p>}
         {integrationSuggestions.length > 0 && <p className="rounded-lg border bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"><span className="font-medium text-foreground">Como usar integrações:</span> escreva seu pedido normalmente. O agente identifica e consulta a plataforma conectada automaticamente — não existe comando especial.</p>}
-        <MessageInput onSend={onSend} disabled={criando || models.length === 0} initialText={initialPrompt} suggestions={integrationSuggestions} />
+        <MessageInput onSend={onSend} disabled={criando || models.length === 0} initialText={initialPrompt} suggestions={integrationSuggestions} integrations={integrationOptions} skills={projectId ? projectSkills.filter((skill) => skill.projectId === projectId) : []} defaultIntegrationId={assistants.find((assistant) => assistant.id === assistantId)?.integrationProvider} />
       </div>
     </div>
   );

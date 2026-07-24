@@ -8,6 +8,7 @@ import { MessageList } from "./message-list";
 import { MessageInput, type Attachment } from "./message-input";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { ChatControls, IntegrationOption, SkillOption } from "./chat-capability-selectors";
 
 const SEM_PROJETO = "__sem_projeto__";
 
@@ -19,6 +20,9 @@ export function Chat({
   project,
   projects = [],
   integrationNames = [],
+  integrationOptions = [],
+  skillOptions = [],
+  defaultIntegrationId,
 }: {
   conversationId: string;
   initialMessages: UIMessage[];
@@ -27,13 +31,16 @@ export function Chat({
   project?: { id: string; name: string } | null;
   projects?: Array<{ id: string; name: string }>;
   integrationNames?: string[];
+  integrationOptions?: IntegrationOption[];
+  skillOptions?: SkillOption[];
+  defaultIntegrationId?: string | null;
 }) {
   const router = useRouter();
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: { conversationId, message: messages.at(-1) },
+      prepareSendMessagesRequest: ({ messages, body }) => ({
+        body: { conversationId, message: messages.at(-1), ...body },
       }),
     }),
     messages: initialMessages,
@@ -47,8 +54,8 @@ export function Chat({
     if (pendente && !enviouPendente.current) {
       enviouPendente.current = true;
       sessionStorage.removeItem(`draft:${conversationId}`);
-      const { text, files } = JSON.parse(pendente);
-      sendMessage({ text, files });
+      const { text, files, controls } = JSON.parse(pendente) as { text: string; files?: Attachment[]; controls?: ChatControls };
+      sendMessage({ text, files }, controls ? { body: controls } : undefined);
     }
   }, [conversationId, sendMessage]);
 
@@ -76,8 +83,8 @@ export function Chat({
     }
   }, [error]);
 
-  function onSend(text: string, files: Attachment[]) {
-    sendMessage({ text, files: files.length ? files : undefined });
+  function onSend(text: string, files: Attachment[], controls: ChatControls) {
+    sendMessage({ text, files: files.length ? files : undefined }, { body: controls });
   }
 
   async function moveToProject(projectId: string | null) {
@@ -97,11 +104,11 @@ export function Chat({
       )}
       {integrationNames.length > 0 && (
         <div className="border-b bg-secondary/20 px-4 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Integrações prontas:</span> {integrationNames.join(", ")}. Escreva normalmente o que deseja consultar; o agente escolhe a ferramenta. <Link href="/integracoes" className="text-primary hover:underline">Ver exemplos</Link>
+          <span className="font-medium text-foreground">Integrações prontas:</span> {integrationNames.join(", ")}. Use o seletor próximo à mensagem para escolher uma plataforma ou mantenha em Automático. <Link href="/integracoes" className="text-primary hover:underline">Ver exemplos</Link>
         </div>
       )}
       <MessageList messages={messages} streaming={status === "streaming"} interruptedMessageIds={interruptedMessageIds} />
-      <MessageInput onSend={onSend} disabled={status !== "ready" && status !== "error"} />
+      <MessageInput onSend={onSend} disabled={status !== "ready" && status !== "error"} integrations={integrationOptions} skills={skillOptions} defaultIntegrationId={defaultIntegrationId} />
     </div>
   );
 }

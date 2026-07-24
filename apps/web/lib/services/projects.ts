@@ -61,7 +61,21 @@ export async function getProjectFile(db: Db, projectId: string, fileId: string, 
   return (await db.select().from(projectFiles).where(and(eq(projectFiles.id, fileId), eq(projectFiles.projectId, projectId))).limit(1))[0] ?? null;
 }
 
-export async function getPersistentProjectFileContext(db: Db, projectId: string) {
+export async function listProjectSkills(db: Db, projectId: string, userId: string) {
+  if (!(await getProject(db, projectId, userId))) return [];
+  return db.select({ id: projectFiles.id, name: projectFiles.filename }).from(projectFiles).where(and(
+    eq(projectFiles.projectId, projectId), eq(projectFiles.kind, "skill"), eq(projectFiles.status, "ready"),
+  )).orderBy(asc(projectFiles.filename));
+}
+
+export async function listUserProjectSkills(db: Db, userId: string) {
+  return db.select({ id: projectFiles.id, name: projectFiles.filename, projectId: projectFiles.projectId }).from(projectFiles)
+    .innerJoin(projects, eq(projects.id, projectFiles.projectId))
+    .where(and(eq(projects.userId, userId), eq(projectFiles.kind, "skill"), eq(projectFiles.status, "ready")))
+    .orderBy(asc(projectFiles.filename));
+}
+
+export async function getPersistentProjectFileContext(db: Db, projectId: string, selectedSkillIds?: string[]) {
   const files = await db.select({ id: projectFiles.id, filename: projectFiles.filename, kind: projectFiles.kind })
     .from(projectFiles).where(and(
       eq(projectFiles.projectId, projectId),
@@ -69,9 +83,15 @@ export async function getPersistentProjectFileContext(db: Db, projectId: string)
       inArray(projectFiles.kind, ["context", "skill"]),
     ));
   if (files.length === 0) return "";
-  const fileById = new Map(files.map((file) => [file.id, file]));
+  const selected = selectedSkillIds?.length ? new Set(selectedSkillIds) : null;
+  if (selected && [...selected].some((id) => !files.some((file) => file.id === id && file.kind === "skill"))) {
+    throw new Error("Uma ou mais skills selecionadas não estão disponíveis neste projeto");
+  }
+  const activeFiles = files.filter((file) => file.kind === "context" || !selected || selected.has(file.id));
+  const fileById = new Map(activeFiles.map((file) => [file.id, file]));
+  if (activeFiles.length === 0) return "";
   const rows = await db.select().from(projectChunks)
-    .where(and(eq(projectChunks.projectId, projectId), inArray(projectChunks.fileId, files.map((file) => file.id))))
+    .where(and(eq(projectChunks.projectId, projectId), inArray(projectChunks.fileId, activeFiles.map((file) => file.id))))
     .orderBy(asc(projectChunks.fileId), asc(projectChunks.chunkIndex));
   let total = 0;
   const sections: string[] = [];

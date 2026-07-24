@@ -34,10 +34,12 @@ import { getPersistentProjectFileContext, getProject } from "@/lib/services/proj
 import { KB_MIMES } from "@/lib/files/storage";
 import { startGlobalContextIngestion } from "@/lib/rag/ingest";
 import { buildPersonalContext, getOwnProfile } from "@/lib/services/profile";
+import { parseChatSelections } from "@/lib/ai/chat-selections";
+import { listUserIntegrations } from "@/lib/services/integrations";
 
 export const maxDuration = 150;
 
-type ChatRequestBody = { message?: unknown; conversationId?: unknown };
+type ChatRequestBody = { message?: unknown; conversationId?: unknown; selectedIntegrationIds?: unknown; selectedSkillIds?: unknown };
 
 function toUiMessages(rows: Awaited<ReturnType<typeof getCompletedMessages>>): UIMessage[] {
   return rows.map((message) => ({
@@ -52,6 +54,7 @@ export const POST = apiHandler(async (req) => {
   const body = (await req.json().catch(() => ({}))) as ChatRequestBody;
   if (typeof body.conversationId !== "string") throw new Error("Conversa inválida");
   const newMessage = validateNewUserMessage(body.message);
+  const selections = parseChatSelections(body);
 
   const got = await getConversation(db, body.conversationId, session.user.id);
   if (!got) return Response.json({ error: "Conversa não encontrada" }, { status: 404 });
@@ -67,7 +70,13 @@ export const POST = apiHandler(async (req) => {
     : null;
   const project = got.conversation.projectId ? await getProject(db, got.conversation.projectId, session.user.id) : null;
   if (got.conversation.projectId && !project) return Response.json({ error: "Este projeto não está mais disponível." }, { status: 403 });
-  const projectFilesContext = project ? await getPersistentProjectFileContext(db, project.id) : "";
+  if (selections.selectedSkillIds.length > 0 && !project) throw new Error("Skills só podem ser acionadas dentro de um projeto");
+  const projectFilesContext = project ? await getPersistentProjectFileContext(db, project.id, selections.selectedSkillIds) : "";
+  if (selections.selectedIntegrationIds.length > 0) {
+    const available = await listUserIntegrations(db, session.user.id);
+    const connected = new Set(available.filter((item) => item.connected).map((item) => item.id));
+    if (selections.selectedIntegrationIds.some((provider) => !connected.has(provider))) throw new Error("Uma ou mais integrações selecionadas não estão conectadas ou liberadas");
+  }
   const modelId = got.conversation.model ?? assistant?.model ?? settings.defaultModel;
   const globallyEnabled = SUPPORTED_MODELS.filter((model) => isModelEnabled(model, settings.disabledModels));
   const userModels = filterUserModels(globallyEnabled, userAccess.allowedModels);
@@ -83,7 +92,13 @@ export const POST = apiHandler(async (req) => {
   const integrationPrompt = assistant?.integrationProvider
     ? `INTEGRAÇÃO PADRÃO DESTE ASSISTENTE: ${INTEGRATIONS[assistant.integrationProvider].name}. Quando a solicitação depender de dados dessa plataforma, use a ferramenta disponível automaticamente. Se a conta do usuário ainda não estiver conectada, explique como conectá-la em Minhas integrações; nunca invente dados.`
     : null;
-  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt].filter(Boolean).join("\n\n");
+  const selectedIntegrationPrompt = selections.selectedIntegrationIds.length
+    ? `O usuário selecionou explicitamente estas integrações para a resposta atual: ${selections.selectedIntegrationIds.map((provider) => INTEGRATIONS[provider].name).join(", ")}. Use somente as selecionadas quando precisar de dados externos.`
+    : null;
+  const selectedSkillPrompt = selections.selectedSkillIds.length
+    ? "O usuário acionou explicitamente as SKILLS identificadas no contexto do projeto. Siga essas skills nesta resposta, subordinadas às regras de segurança e da empresa."
+    : null;
+  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt, selectedIntegrationPrompt, selectedSkillPrompt].filter(Boolean).join("\n\n");
   const systemPrompt = composeSystemPrompt({
     globalContext,
     userContext: buildPersonalContext(ownProfile),
@@ -192,7 +207,10 @@ export const POST = apiHandler(async (req) => {
       assistantId: assistant?.id,
     }, { beforeCall: beforeAgentCall });
     let integrationCalls = 0;
-    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId, projectId: project?.id }, { providers: assistant?.integrationProvider ? [assistant.integrationProvider] : undefined, beforeCall: () => {
+    const requestedProviders = selections.selectedIntegrationIds.length
+      ? selections.selectedIntegrationIds
+      : assistant?.integrationProvider ? [assistant.integrationProvider] : undefined;
+    const integrationTools = await createIntegrationTools(db, { userId: session.user.id, conversationId: body.conversationId, projectId: project?.id }, { providers: requestedProviders, beforeCall: () => {
       integrationCalls += 1;
       if (integrationCalls > 4) throw new Error("Limite de consultas a integrações nesta resposta atingido");
     } });

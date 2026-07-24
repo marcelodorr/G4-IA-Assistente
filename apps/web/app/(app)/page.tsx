@@ -6,19 +6,20 @@ import { SUPPORTED_MODELS } from "@/lib/ai/models";
 import { auth } from "@/lib/auth";
 import { filterUserModels, getUserAccess } from "@/lib/services/users";
 import { listUserIntegrations } from "@/lib/services/integrations";
-import { listProjects } from "@/lib/services/projects";
+import { listProjects, listUserProjectSkills } from "@/lib/services/projects";
 import { getOwnProfile } from "@/lib/services/profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewChatPage({ searchParams }: { searchParams: Promise<{ prompt?: string; project?: string }> }) {
   const session = (await auth())!;
-  const [assistentes, settings, access, integrations, projects, profile, params] = await Promise.all([
+  const [assistentes, settings, access, integrations, projects, projectSkills, profile, params] = await Promise.all([
     listAssistantsForUser(db, session.user.id),
     getSettings(db),
     getUserAccess(db, session.user.id),
     listUserIntegrations(db, session.user.id),
     listProjects(db, session.user.id),
+    listUserProjectSkills(db, session.user.id),
     getOwnProfile(db, session.user.id),
     searchParams,
   ]);
@@ -38,5 +39,6 @@ export default async function NewChatPage({ searchParams }: { searchParams: Prom
   }
   const initialPrompt = typeof params.prompt === "string" ? params.prompt.slice(0, 12_000) : "";
   const initialProjectId = typeof params.project === "string" && projects.some((project) => project.id === params.project) ? params.project : null;
-  return <NewChat assistants={assistants} projects={projects.map(({ id, name }) => ({ id, name }))} initialProjectId={initialProjectId} defaultModel={defaultModel} models={models} initialPrompt={initialPrompt} integrationSuggestions={integrationSuggestions} />;
+  const connectedIntegrations = integrations.filter((item) => item.connected);
+  return <NewChat assistants={assistants} projects={projects.map(({ id, name }) => ({ id, name }))} projectSkills={projectSkills} integrationOptions={connectedIntegrations.map((item) => ({ id: item.id, name: item.name, managedByCompany: item.managedByCompany }))} initialProjectId={initialProjectId} defaultModel={defaultModel} models={models} initialPrompt={initialPrompt} integrationSuggestions={integrationSuggestions} />;
 }

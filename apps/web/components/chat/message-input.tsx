@@ -7,6 +7,7 @@ import { CHAT_LIMITS } from "@/lib/ai/chat-policy";
 import { Input } from "@/components/ui/input";
 import { LinkIcon } from "lucide-react";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/files/policy";
+import { ChatCapabilitySelectors, type ChatControls, type IntegrationOption, type SkillOption } from "./chat-capability-selectors";
 
 // Formato compatível com FileUIPart (pacote "ai"): sendMessage({ text, files })
 // aceita FileList | FileUIPart[], e é isso que anexamos aqui.
@@ -17,11 +18,17 @@ export function MessageInput({
   disabled,
   initialText = "",
   suggestions = [],
+  integrations = [],
+  skills = [],
+  defaultIntegrationId,
 }: {
-  onSend: (text: string, files: Attachment[]) => void;
+  onSend: (text: string, files: Attachment[], controls: ChatControls) => void;
   disabled: boolean;
   initialText?: string;
   suggestions?: string[];
+  integrations?: IntegrationOption[];
+  skills?: SkillOption[];
+  defaultIntegrationId?: string | null;
 }) {
   const [text, setText] = useState(initialText);
   const [files, setFiles] = useState<Attachment[]>([]);
@@ -30,6 +37,11 @@ export function MessageInput({
   const [mostrarLink, setMostrarLink] = useState(false);
   const [enviandoLink, setEnviandoLink] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [controls, setControls] = useState<ChatControls>({ selectedIntegrationIds: [], selectedSkillIds: [] });
+  const effectiveControls: ChatControls = {
+    selectedIntegrationIds: controls.selectedIntegrationIds.filter((id) => integrations.some((item) => item.id === id)),
+    selectedSkillIds: controls.selectedSkillIds.filter((id) => skills.some((item) => item.id === id)),
+  };
 
   async function attach(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -80,13 +92,14 @@ export function MessageInput({
   function submit() {
     if (disabled) return;
     if (!text.trim() && files.length === 0) return;
-    onSend(text.trim(), files);
+    onSend(text.trim(), files, effectiveControls);
     setText("");
     setFiles([]);
   }
 
   return (
     <div className="border-t p-4">
+      <ChatCapabilitySelectors integrations={integrations} skills={skills} controls={effectiveControls} onChange={setControls} defaultIntegrationId={defaultIntegrationId} />
       {suggestions.length > 0 && !text && (
         <div className="mb-3 space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">Experimente perguntar:</p>

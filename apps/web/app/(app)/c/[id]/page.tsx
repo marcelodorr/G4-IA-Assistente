@@ -7,7 +7,7 @@ import { assistants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { Chat } from "@/components/chat/chat";
 import { listUserIntegrations } from "@/lib/services/integrations";
-import { getProject, listProjects } from "@/lib/services/projects";
+import { getProject, listProjectSkills, listProjects } from "@/lib/services/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +28,12 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     parts: m.parts,
   })) as unknown as UIMessage[];
   const interruptedMessageIds = got.messages.filter((message) => message.status === "interrupted").map((message) => message.id);
-  const [userIntegrations, projects] = await Promise.all([listUserIntegrations(db, session.user.id), listProjects(db, session.user.id)]);
-  const integrationNames = userIntegrations
-    .filter((item) => item.connected && (!assistant?.integrationProvider || item.id === assistant.integrationProvider))
-    .map((item) => item.name);
-  return <Chat conversationId={id} initialMessages={initialMessages} interruptedMessageIds={interruptedMessageIds} assistantName={assistant?.name} project={project ? { id: project.id, name: project.name } : null} projects={projects.map(({ id: projectId, name }) => ({ id: projectId, name }))} integrationNames={integrationNames} />;
+  const [userIntegrations, projects, skills] = await Promise.all([
+    listUserIntegrations(db, session.user.id),
+    listProjects(db, session.user.id),
+    project ? listProjectSkills(db, project.id, session.user.id) : [],
+  ]);
+  const connectedIntegrations = userIntegrations.filter((item) => item.connected);
+  const integrationNames = connectedIntegrations.map((item) => item.name);
+  return <Chat conversationId={id} initialMessages={initialMessages} interruptedMessageIds={interruptedMessageIds} assistantName={assistant?.name} project={project ? { id: project.id, name: project.name } : null} projects={projects.map(({ id: projectId, name }) => ({ id: projectId, name }))} integrationNames={integrationNames} integrationOptions={connectedIntegrations.map((item) => ({ id: item.id, name: item.name, managedByCompany: item.managedByCompany }))} skillOptions={skills} defaultIntegrationId={assistant?.integrationProvider} />;
 }
