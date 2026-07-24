@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
-type Props = { user: Session["user"]; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage };
+type Props = { user: Session["user"]; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage | null };
 
 function SidebarContent({ user, conversations, projects, usage, live }: Props & { live: boolean }) {
   return <><div className="p-4"><Logo className="h-6 w-auto" /></div><div className="space-y-2 px-3 pb-2"><Button asChild className="w-full"><Link href="/">Nova conversa</Link></Button><Button asChild variant="outline" className="w-full"><Link href="/projetos">Projetos</Link></Button></div><ConversationList conversations={conversations} projects={projects} user={user} usage={usage} liveUsage={live} /></>;

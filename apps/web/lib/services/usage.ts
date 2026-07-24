@@ -1,5 +1,5 @@
-import { and, eq, gte, sql } from "drizzle-orm";
-import { aiUsage, settings, users } from "@/lib/db/schema";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { aiUsage, conversations, settings, users } from "@/lib/db/schema";
 import { estimateCostMicros } from "@/lib/ai/models";
 import type { Db, Tx } from "@/lib/db";
 
@@ -198,18 +198,24 @@ export async function getUserUsageSummary(db: Db, userId: string) {
       where user_id = ${userId}
         and created_at >= ${week.getTime() < month.getTime() ? week : month}
     `),
-    db.execute(sql`
-      select a.id, a.kind, a.model, a.input_tokens as "inputTokens",
-        a.output_tokens as "outputTokens", a.reserved_tokens as "reservedTokens",
-        a.duration_ms as "durationMs", a.success, a.created_at as "createdAt",
-        a.finished_at as "finishedAt", a.conversation_id as "conversationId",
-        coalesce(c.title, 'Nova conversa') as "conversationTitle"
-      from ai_usage a
-      left join conversations c on c.id = a.conversation_id
-      where a.user_id = ${userId}
-      order by a.created_at desc
-      limit 30
-    `),
+    db.select({
+      id: aiUsage.id,
+      kind: aiUsage.kind,
+      model: aiUsage.model,
+      inputTokens: aiUsage.inputTokens,
+      outputTokens: aiUsage.outputTokens,
+      reservedTokens: aiUsage.reservedTokens,
+      durationMs: aiUsage.durationMs,
+      success: aiUsage.success,
+      createdAt: aiUsage.createdAt,
+      finishedAt: aiUsage.finishedAt,
+      conversationId: aiUsage.conversationId,
+      conversationTitle: conversations.title,
+    }).from(aiUsage)
+      .leftJoin(conversations, eq(conversations.id, aiUsage.conversationId))
+      .where(eq(aiUsage.userId, userId))
+      .orderBy(desc(aiUsage.createdAt))
+      .limit(30),
   ]);
 
   const numberValue = (value: unknown) => {
@@ -231,26 +237,25 @@ export async function getUserUsageSummary(db: Db, userId: string) {
       weekly: quotaPeriod(numberValue(totalRow.weeklyUsed), weeklyLimit, nextWeek, user.weekly != null),
       monthly: quotaPeriod(numberValue(totalRow.monthlyUsed), monthlyLimit, nextMonth, user.monthly != null),
     },
-    interactions: [...activity].map((value) => {
-      const row = value as Record<string, unknown>;
+    interactions: activity.map((row) => {
       const inputTokens = numberValue(row.inputTokens);
       const outputTokens = numberValue(row.outputTokens);
       const reservedTokens = numberValue(row.reservedTokens);
       const processing = row.finishedAt == null;
       return {
-        id: String(row.id),
-        kind: String(row.kind) as "chat" | "embedding" | "image" | "artifact",
-        model: String(row.model),
-        conversationId: row.conversationId == null ? null : String(row.conversationId),
-        conversationTitle: String(row.conversationTitle ?? "Nova conversa"),
+        id: row.id,
+        kind: row.kind,
+        model: row.model,
+        conversationId: row.conversationId,
+        conversationTitle: row.conversationTitle ?? "Nova conversa",
         inputTokens,
         outputTokens,
         tokens: Math.max(inputTokens + outputTokens, reservedTokens),
         processing,
-        success: row.success == null ? null : Boolean(row.success),
+        success: row.success,
         durationMs: row.durationMs == null ? null : numberValue(row.durationMs),
-        createdAt: new Date(String(row.createdAt)).toISOString(),
-        finishedAt: row.finishedAt == null ? null : new Date(String(row.finishedAt)).toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        finishedAt: row.finishedAt?.toISOString() ?? null,
       };
     }),
   };

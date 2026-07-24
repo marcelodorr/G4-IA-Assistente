@@ -19,7 +19,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a cada navegação para não deixar um usuário desativado usar o app.
   const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
-  const [convs, projects, usage] = await Promise.all([listConversations(db, session.user.id), listProjects(db, session.user.id), getUserUsageSummary(db, session.user.id)]);
+  const [convs, projects, usage] = await Promise.all([
+    listConversations(db, session.user.id),
+    listProjects(db, session.user.id),
+    getUserUsageSummary(db, session.user.id).catch((error) => {
+      // Métricas são auxiliares: uma falha nelas nunca deve derrubar o chat.
+      console.error("[layout] Falha ao carregar o uso individual", error);
+      return null;
+    }),
+  ]);
   return (
     <div className="flex h-screen">
       <Sidebar user={session.user} conversations={convs} projects={projects} usage={usage} />

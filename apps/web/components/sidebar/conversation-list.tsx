@@ -28,7 +28,7 @@ export function ConversationList({
   conversations: ConversationRow[];
   projects: ProjectRow[];
   user: Session["user"];
-  usage: Usage;
+  usage: Usage | null;
   liveUsage: boolean;
 }) {
   const pathname = usePathname();
