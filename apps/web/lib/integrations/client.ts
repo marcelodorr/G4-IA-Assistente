@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { integrationActivity, integrationConnections } from "@/lib/db/schema";
 import { INTEGRATIONS, type IntegrationProvider } from "./catalog";
@@ -130,8 +130,10 @@ export async function executeIntegrationQuery(db: Db, input: {
 }) {
   if (!(await canUserUseIntegration(db, input.userId, input.provider))) throw new Error("Esta integração não está liberada para o usuário");
   const startedAt = Date.now();
+  let connectionId: string | null = null;
   try {
     const { token, connection } = await getValidAccessToken(db, input.userId, input.provider);
+    connectionId = connection.id;
     let result: unknown;
     if (input.provider === "google_calendar") result = await googleCalendar(token, input.params);
     else if (input.provider === "hubspot") result = await hubspot(token, input.params);
@@ -142,7 +144,7 @@ export async function executeIntegrationQuery(db: Db, input: {
     const content = compactResult(result);
     await Promise.all([
       db.insert(integrationActivity).values({ userId: input.userId, conversationId: input.conversationId ?? null, provider: input.provider, action: input.action, requestSummary: input.params, resultContent: content, success: true }),
-      db.update(integrationConnections).set({ lastUsedAt: new Date(), lastError: null, updatedAt: new Date() }).where(and(eq(integrationConnections.userId, input.userId), eq(integrationConnections.provider, input.provider))),
+      db.update(integrationConnections).set({ lastUsedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(integrationConnections.id, connection.id)),
     ]);
     if (!input.projectId) void captureCorporateMemory(db, {
       userId: input.userId, conversationId: input.conversationId, sourceType: "integration", sourceProvider: input.provider,
@@ -153,7 +155,7 @@ export async function executeIntegrationQuery(db: Db, input: {
     const message = error instanceof Error ? error.message : String(error);
     await Promise.all([
       db.insert(integrationActivity).values({ userId: input.userId, conversationId: input.conversationId ?? null, provider: input.provider, action: input.action, requestSummary: input.params, success: false, error: message }),
-      db.update(integrationConnections).set({ lastError: message, updatedAt: new Date() }).where(and(eq(integrationConnections.userId, input.userId), eq(integrationConnections.provider, input.provider))),
+      connectionId ? db.update(integrationConnections).set({ lastError: message, updatedAt: new Date() }).where(eq(integrationConnections.id, connectionId)) : Promise.resolve(),
     ]);
     throw error;
   }
@@ -165,7 +167,6 @@ export async function connectApify(db: Db, userId: string, token: string) {
   const profile = await fetchJson("https://api.apify.com/v2/users/me", { headers: { Authorization: `Bearer ${trimmed}` } }) as { data?: { id?: string; username?: string; email?: string; profile?: { name?: string } } };
   const account = profile.data;
   await saveUserConnection(db, { userId, provider: "apify", accessToken: trimmed, externalAccountId: account?.id, accountLabel: account?.email ?? account?.profile?.name ?? account?.username ?? "Apify conectado" });
-  void syncIntegrationSnapshot(db, userId, "apify").catch((error) => console.error("[integração] sincronização inicial Apify falhou", error));
 }
 
 export async function connectGitBook(db: Db, userId: string, token: string) {
@@ -179,7 +180,6 @@ export async function connectGitBook(db: Db, userId: string, token: string) {
     externalAccountId: profile.id,
     accountLabel: profile.email ?? profile.displayName ?? "GitBook conectado",
   });
-  void syncIntegrationSnapshot(db, userId, "gitbook").catch((error) => console.error("[integração] sincronização inicial GitBook falhou", error));
 }
 
 export function syncIntegrationSnapshot(db: Db, userId: string, provider: IntegrationProvider) {

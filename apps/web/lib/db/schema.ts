@@ -123,6 +123,8 @@ export const projectChunks = pgTable("project_chunks", {
 export const integrationConfigs = pgTable("integration_configs", {
   provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).primaryKey(),
   active: boolean("active").notNull().default(false),
+  connectionMode: text("connection_mode", { enum: ["individual", "universal"] }).notNull().default("individual"),
+  universalConnectionUserId: uuid("universal_connection_user_id").references(() => users.id, { onDelete: "set null" }),
   clientId: text("client_id"),
   clientSecretEncrypted: text("client_secret_encrypted"),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -163,6 +165,7 @@ export const integrationOauthStates = pgTable("integration_oauth_states", {
   tokenHash: text("token_hash").primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "jira"] }).notNull(),
+  connectionMode: text("connection_mode", { enum: ["individual", "universal"] }).notNull().default("individual"),
   redirectUri: text("redirect_uri").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

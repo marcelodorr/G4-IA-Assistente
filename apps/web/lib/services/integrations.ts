@@ -8,15 +8,22 @@ import { INTEGRATIONS, INTEGRATION_PROVIDERS, type IntegrationProvider } from "@
 const hashState = (state: string) => createHash("sha256").update(state).digest("hex");
 
 export async function listIntegrationAdmin(db: Db) {
-  const [configs, access] = await Promise.all([
+  const [configs, access, connections] = await Promise.all([
     db.select().from(integrationConfigs),
     db.select().from(userIntegrationAccess),
+    db.select().from(integrationConnections),
   ]);
   return INTEGRATION_PROVIDERS.map((provider) => {
     const config = configs.find((item) => item.provider === provider);
+    const universalConnection = config?.universalConnectionUserId
+      ? connections.find((item) => item.provider === provider && item.userId === config.universalConnectionUserId)
+      : null;
     return {
       ...INTEGRATIONS[provider],
       active: config?.active ?? false,
+      connectionMode: config?.connectionMode ?? "individual",
+      universalConnected: universalConnection?.status === "connected",
+      universalAccountLabel: universalConnection?.accountLabel ?? null,
       clientId: config?.clientId ?? "",
       secretConfigured: Boolean(config?.clientSecretEncrypted),
       userIds: access.filter((item) => item.provider === provider).map((item) => item.userId),
@@ -29,10 +36,12 @@ export async function updateIntegrationConfig(db: Db, provider: IntegrationProvi
   clientId?: string;
   clientSecret?: string;
   clearSecret?: boolean;
+  connectionMode?: "individual" | "universal";
   userIds: string[];
   updatedBy: string;
 }) {
   const definition = INTEGRATIONS[provider];
+  const connectionMode = input.connectionMode ?? "individual";
   const clientId = definition.authType === "oauth" ? input.clientId?.trim() || null : null;
   const existing = (await db.select().from(integrationConfigs).where(eq(integrationConfigs.provider, provider)))[0];
   const clientSecretEncrypted = input.clearSecret ? null
@@ -47,11 +56,11 @@ export async function updateIntegrationConfig(db: Db, provider: IntegrationProvi
     if (valid.length !== userIds.length) throw new Error("Um ou mais usuários são inválidos");
   }
   await db.transaction(async (tx) => {
-    await tx.insert(integrationConfigs).values({ provider, active: input.active, clientId, clientSecretEncrypted, updatedBy: input.updatedBy, updatedAt: new Date() })
-      .onConflictDoUpdate({ target: integrationConfigs.provider, set: { active: input.active, clientId, clientSecretEncrypted, updatedBy: input.updatedBy, updatedAt: new Date() } });
+    await tx.insert(integrationConfigs).values({ provider, active: input.active, connectionMode, clientId, clientSecretEncrypted, updatedBy: input.updatedBy, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: integrationConfigs.provider, set: { active: input.active, connectionMode, clientId, clientSecretEncrypted, universalConnectionUserId: connectionMode === "individual" ? null : existing?.universalConnectionUserId ?? null, updatedBy: input.updatedBy, updatedAt: new Date() } });
     await tx.delete(userIntegrationAccess).where(eq(userIntegrationAccess.provider, provider));
-    if (userIds.length) await tx.insert(userIntegrationAccess).values(userIds.map((userId) => ({ userId, provider })));
-    await tx.delete(integrationConnections).where(userIds.length
+    if (connectionMode === "individual" && userIds.length) await tx.insert(userIntegrationAccess).values(userIds.map((userId) => ({ userId, provider })));
+    if (connectionMode === "individual") await tx.delete(integrationConnections).where(userIds.length
       ? and(eq(integrationConnections.provider, provider), notInArray(integrationConnections.userId, userIds))
       : eq(integrationConnections.provider, provider));
   });
@@ -67,6 +76,9 @@ export async function getIntegrationConfig(db: Db, provider: IntegrationProvider
 }
 
 export async function canUserUseIntegration(db: Db, userId: string, provider: IntegrationProvider) {
+  const [config] = await db.select({ active: integrationConfigs.active, mode: integrationConfigs.connectionMode }).from(integrationConfigs).where(eq(integrationConfigs.provider, provider)).limit(1);
+  if (!config?.active) return false;
+  if (config.mode === "universal") return true;
   const [row] = await db.select({ provider: userIntegrationAccess.provider }).from(userIntegrationAccess)
     .innerJoin(integrationConfigs, eq(integrationConfigs.provider, userIntegrationAccess.provider))
     .where(and(eq(userIntegrationAccess.userId, userId), eq(userIntegrationAccess.provider, provider), eq(integrationConfigs.active, true))).limit(1);
@@ -74,16 +86,22 @@ export async function canUserUseIntegration(db: Db, userId: string, provider: In
 }
 
 export async function listUserIntegrations(db: Db, userId: string) {
-  const [access, connections, configs] = await Promise.all([
+  const [access, connections, configs, user] = await Promise.all([
     db.select().from(userIntegrationAccess).where(eq(userIntegrationAccess.userId, userId)),
-    db.select().from(integrationConnections).where(eq(integrationConnections.userId, userId)),
+    db.select().from(integrationConnections),
     db.select().from(integrationConfigs).where(eq(integrationConfigs.active, true)),
+    db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1),
   ]);
   const active = new Set(configs.map((item) => item.provider));
-  return access.filter((item) => active.has(item.provider)).map((item) => {
-    const connection = connections.find((current) => current.provider === item.provider);
+  const personalProviders = new Set(access.filter((item) => active.has(item.provider)).map((item) => item.provider));
+  return configs.filter((config) => config.connectionMode === "universal" || personalProviders.has(config.provider)).map((config) => {
+    const ownerId = config.connectionMode === "universal" ? config.universalConnectionUserId : userId;
+    const connection = ownerId ? connections.find((current) => current.provider === config.provider && current.userId === ownerId) : null;
     return {
-      ...INTEGRATIONS[item.provider],
+      ...INTEGRATIONS[config.provider],
+      connectionMode: config.connectionMode,
+      managedByCompany: config.connectionMode === "universal",
+      canConfigure: config.connectionMode === "individual" || user[0]?.role === "admin",
       connected: connection?.status === "connected",
       status: connection?.status ?? "not_connected",
       accountLabel: connection?.accountLabel ?? null,
@@ -98,6 +116,19 @@ export async function getUserConnection(db: Db, userId: string, provider: Integr
     eq(integrationConnections.userId, userId),
     eq(integrationConnections.provider, provider),
   )))[0] ?? null;
+}
+
+export async function getEffectiveConnection(db: Db, userId: string, provider: IntegrationProvider) {
+  const config = await getIntegrationConfig(db, provider);
+  const ownerId = config.connectionMode === "universal" ? config.universalConnectionUserId : userId;
+  if (!ownerId) return { connection: null, ownerId: null, universal: config.connectionMode === "universal" };
+  return { connection: await getUserConnection(db, ownerId, provider), ownerId, universal: config.connectionMode === "universal" };
+}
+
+export async function markUniversalConnectionOwner(db: Db, provider: IntegrationProvider, userId: string) {
+  await db.update(integrationConfigs).set({ universalConnectionUserId: userId, updatedAt: new Date() }).where(and(
+    eq(integrationConfigs.provider, provider), eq(integrationConfigs.connectionMode, "universal"),
+  ));
 }
 
 export async function saveUserConnection(db: Db, input: {
@@ -132,9 +163,9 @@ export async function disconnectIntegration(db: Db, userId: string, provider: In
   await db.delete(integrationConnections).where(and(eq(integrationConnections.userId, userId), eq(integrationConnections.provider, provider)));
 }
 
-export async function createOauthState(db: Db, userId: string, provider: Exclude<IntegrationProvider, "apify" | "gitbook">, redirectUri: string) {
+export async function createOauthState(db: Db, userId: string, provider: Exclude<IntegrationProvider, "apify" | "gitbook">, redirectUri: string, connectionMode: "individual" | "universal" = "individual") {
   const state = randomBytes(32).toString("base64url");
-  await db.insert(integrationOauthStates).values({ tokenHash: hashState(state), userId, provider, redirectUri, expiresAt: new Date(Date.now() + 10 * 60_000) });
+  await db.insert(integrationOauthStates).values({ tokenHash: hashState(state), userId, provider, connectionMode, redirectUri, expiresAt: new Date(Date.now() + 10 * 60_000) });
   return state;
 }
 

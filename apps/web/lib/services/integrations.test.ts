@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, truncateAll } from "@/test/helpers/db";
 import { integrationConnections, users } from "@/lib/db/schema";
-import { canUserUseIntegration, consumeOauthState, createOauthState, getIntegrationConfig, listUserIntegrations, saveUserConnection, updateIntegrationConfig } from "./integrations";
+import { canUserUseIntegration, consumeOauthState, createOauthState, getEffectiveConnection, getIntegrationConfig, listUserIntegrations, markUniversalConnectionOwner, saveUserConnection, updateIntegrationConfig } from "./integrations";
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 
@@ -34,6 +34,18 @@ suite("integrations service", () => {
     const [raw] = await db.select().from(integrationConnections).where(eq(integrationConnections.userId, user.id));
     expect(raw.accessTokenEncrypted).not.toContain("access-token");
     expect((await listUserIntegrations(db, user.id))[0]).toMatchObject({ connected: true, accountLabel: "user@sequor.com.br" });
+  });
+
+  it("disponibiliza uma conexão universal para todos sem duplicar credenciais", async () => {
+    const db = await getTestDb();
+    const admin = await seedUser();
+    const [member] = await db.insert(users).values({ name: "Membro", email: "member@sequor.com.br", passwordHash: "hash" }).returning();
+    await updateIntegrationConfig(db, "gitbook", { active: true, connectionMode: "universal", userIds: [], updatedBy: admin.id });
+    await saveUserConnection(db, { userId: admin.id, provider: "gitbook", accessToken: "company-token", accountLabel: "GitBook Sequor" });
+    await markUniversalConnectionOwner(db, "gitbook", admin.id);
+    expect(await canUserUseIntegration(db, member.id, "gitbook")).toBe(true);
+    expect(await getEffectiveConnection(db, member.id, "gitbook")).toMatchObject({ ownerId: admin.id, universal: true, connection: { accountLabel: "GitBook Sequor" } });
+    expect((await listUserIntegrations(db, member.id))[0]).toMatchObject({ id: "gitbook", connected: true, managedByCompany: true, canConfigure: false });
   });
 
   it("consome state OAuth uma única vez", async () => {

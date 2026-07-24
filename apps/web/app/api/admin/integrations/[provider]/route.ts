@@ -8,12 +8,13 @@ export const PATCH = apiHandler(async (req, { params }) => {
   const { provider } = await params;
   if (!isIntegrationProvider(provider)) return Response.json({ error: "Integração inválida" }, { status: 404 });
   const body = await req.json() as Record<string, unknown>;
-  if (typeof body.active !== "boolean" || !Array.isArray(body.userIds) || body.userIds.some((id) => typeof id !== "string")) throw new Error("Configuração inválida");
+  if (typeof body.active !== "boolean" || !["individual", "universal"].includes(String(body.connectionMode)) || !Array.isArray(body.userIds) || body.userIds.some((id) => typeof id !== "string")) throw new Error("Configuração inválida");
   await updateIntegrationConfig(db, provider, {
     active: body.active,
     clientId: typeof body.clientId === "string" ? body.clientId : undefined,
     clientSecret: typeof body.clientSecret === "string" ? body.clientSecret : undefined,
     clearSecret: body.clearSecret === true,
+    connectionMode: body.connectionMode as "individual" | "universal",
     userIds: body.userIds as string[],
     updatedBy: session.user.id,
   });

@@ -1,7 +1,7 @@
 import { decrypt } from "@/lib/crypto";
 import type { Db } from "@/lib/db";
 import { INTEGRATIONS, type IntegrationProvider } from "./catalog";
-import { getIntegrationConfig, getUserConnection, saveUserConnection } from "@/lib/services/integrations";
+import { getEffectiveConnection, getIntegrationConfig, getUserConnection, saveUserConnection } from "@/lib/services/integrations";
 
 type OAuthProvider = Exclude<IntegrationProvider, "apify" | "gitbook">;
 type TokenResponse = {
@@ -103,17 +103,18 @@ export async function exchangeAuthorizationCode(db: Db, userId: string, provider
 }
 
 export async function getValidAccessToken(db: Db, userId: string, provider: IntegrationProvider) {
-  const connection = await getUserConnection(db, userId, provider);
-  if (!connection || connection.status !== "connected") throw new Error(`${INTEGRATIONS[provider].name} não está conectado para este usuário`);
+  const effective = await getEffectiveConnection(db, userId, provider);
+  const connection = effective.connection;
+  if (!connection || connection.status !== "connected") throw new Error(effective.universal ? `${INTEGRATIONS[provider].name} ainda não foi conectado pelo administrador` : `${INTEGRATIONS[provider].name} não está conectado para este usuário`);
   if (!connection.expiresAt || connection.expiresAt.getTime() > Date.now() + 60_000) return { token: decrypt(connection.accessTokenEncrypted), connection };
   if (provider === "apify" || provider === "gitbook" || !connection.refreshTokenEncrypted) throw new Error("A autorização expirou. Reconecte a integração.");
   const refreshToken = decrypt(connection.refreshTokenEncrypted);
   const token = await requestOAuthToken(db, provider, { grant_type: "refresh_token", refresh_token: refreshToken }, true);
   await saveUserConnection(db, {
-    userId, provider, accessToken: token.access_token, refreshToken: token.refresh_token ?? refreshToken,
+    userId: effective.ownerId!, provider, accessToken: token.access_token, refreshToken: token.refresh_token ?? refreshToken,
     expiresIn: token.expires_in, scopes: token.scope ?? connection.scopes,
     externalAccountId: connection.externalAccountId, accountLabel: connection.accountLabel,
     metadata: connection.metadata as Record<string, unknown>,
   });
-  return { token: token.access_token, connection: (await getUserConnection(db, userId, provider))! };
+  return { token: token.access_token, connection: (await getUserConnection(db, effective.ownerId!, provider))! };
 }

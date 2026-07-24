@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { isIntegrationProvider } from "@/lib/integrations/catalog";
 import { exchangeAuthorizationCode, getPublicOrigin } from "@/lib/integrations/oauth";
-import { consumeOauthState } from "@/lib/services/integrations";
+import { consumeOauthState, markUniversalConnectionOwner } from "@/lib/services/integrations";
 import { requireSession } from "@/lib/services/guards";
 import { syncIntegrationSnapshot } from "@/lib/integrations/client";
 
@@ -24,7 +24,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
     if (!code || !state) throw new Error("Resposta OAuth incompleta");
     const oauthState = await consumeOauthState(db, state);
     if (oauthState.userId !== session.user.id || oauthState.provider !== provider) throw new Error("Autorização não pertence a este usuário");
+    if (oauthState.connectionMode === "universal" && session.user.role !== "admin") throw new Error("Somente administradores podem conectar uma integração universal");
     await exchangeAuthorizationCode(db, session.user.id, provider, code, oauthState.redirectUri);
+    if (oauthState.connectionMode === "universal") await markUniversalConnectionOwner(db, provider, session.user.id);
     void syncIntegrationSnapshot(db, session.user.id, provider).catch((syncError) => console.error(`[integração] sincronização inicial ${provider} falhou`, syncError));
     return Response.redirect(destination(req, { connected: provider }), 303);
   } catch (error) {

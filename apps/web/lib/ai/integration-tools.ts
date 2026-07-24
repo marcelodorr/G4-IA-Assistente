@@ -18,7 +18,7 @@ export async function createIntegrationTools(db: Db, owner: Owner, options?: { b
   const tools: ToolSet = {};
 
   if (connected.has("google_calendar")) tools.consultarGoogleCalendar = tool({
-    description: "Consulta eventos reais do Google Calendar conectado pelo usuário. Use somente quando a pergunta depender da agenda atual.",
+    description: "Consulta eventos reais do Google Calendar disponível para este usuário, em conta individual ou corporativa. Use somente quando a pergunta depender da agenda atual.",
     inputSchema: z.object({
       from: z.string().datetime().optional().describe("Início ISO 8601; padrão: agora"),
       to: z.string().datetime().optional().describe("Fim ISO 8601; padrão: 30 dias"),
@@ -53,7 +53,7 @@ export async function createIntegrationTools(db: Db, owner: Owner, options?: { b
   });
 
   if (connected.has("gitbook")) tools.consultarGitBook = tool({
-    description: "Consulta documentação atual e somente leitura no GitBook do usuário: organizações, espaços, buscas e páginas em Markdown. Use como fonte principal quando este assistente estiver configurado com GitBook.",
+    description: "Consulta documentação atual e somente leitura no GitBook disponível para o usuário, inclusive a base corporativa universal: organizações, espaços, buscas e páginas em Markdown. Use como fonte principal quando este assistente estiver configurado com GitBook.",
     inputSchema: z.object({
       action: z.enum(["list_organizations", "list_spaces", "search", "list_pages", "get_page"]),
       organizationId: z.string().max(200).optional().describe("Obrigatório para listar espaços ou pesquisar"),
