@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import type { Db } from "@/lib/db";
-import { generateDocument, generatePresentation, generateSpreadsheet } from "./artifacts";
+import { generateDocument, generatePresentation, generateSpreadsheet, getOpenAIImageEndpoint, readImageApiResponse } from "./artifacts";
 
 function fakeDb() {
   return {
@@ -38,5 +38,20 @@ describe("artifact generators", () => {
     expect(names.some((name) => name.endsWith(".pptx"))).toBe(true);
     const pdfName = names.find((name) => name.endsWith(".pdf"))!;
     expect((await readFile(path.join(dataDir, "artifacts", pdfName))).subarray(0, 4).toString()).toBe("%PDF");
+  });
+
+  it("normaliza a URL da API de imagens mesmo com /v1/ no final", () => {
+    expect(getOpenAIImageEndpoint("https://api.openai.com/v1/")).toBe("https://api.openai.com/v1/images/generations");
+    expect(getOpenAIImageEndpoint("https://proxy.exemplo.com/")).toBe("https://proxy.exemplo.com/v1/images/generations");
+  });
+
+  it("transforma páginas HTML do provedor em erro compreensível", async () => {
+    const response = new Response("<!DOCTYPE html><html><body>Bad gateway</body></html>", { status: 502, headers: { "Content-Type": "text/html" } });
+    await expect(readImageApiResponse(response)).rejects.toThrow(/página web \(HTTP 502\).*OPENAI_BASE_URL/i);
+  });
+
+  it("aceita a resposta JSON válida da API de imagens", async () => {
+    const response = new Response(JSON.stringify({ data: [{ b64_json: "aW1hZ2Vt" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    await expect(readImageApiResponse(response)).resolves.toEqual({ data: [{ b64_json: "aW1hZ2Vt" }] });
   });
 });

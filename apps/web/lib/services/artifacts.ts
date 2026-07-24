@@ -14,10 +14,45 @@ type ArtifactOwner = { userId: string; conversationId: string; assistantId?: str
 type ImageInput = { prompt: string; size: "1024x1024" | "1024x1536" | "1536x1024"; quality: "low" | "medium" | "high" };
 type Section = { heading: string; content: string };
 type Slide = { title: string; bullets: string[] };
+type ImageApiResponse = { data?: Array<{ b64_json?: string }>; error?: { message?: string } };
+type ImageApiSuccess = { data: [{ b64_json: string }, ...Array<{ b64_json?: string }>]; error?: { message?: string } };
 
 function safeBaseName(value: string, fallback: string) {
   return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || fallback;
+}
+
+export function getOpenAIImageEndpoint(baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com") {
+  const normalized = baseUrl.trim().replace(/\/+$/, "").replace(/\/v1$/, "");
+  try {
+    new URL(normalized);
+  } catch {
+    throw new Error("O endereço da API de IA está inválido. O administrador deve revisar OPENAI_BASE_URL.");
+  }
+  return `${normalized}/v1/images/generations`;
+}
+
+export async function readImageApiResponse(response: Response): Promise<ImageApiSuccess> {
+  const rawBody = await response.text();
+  let body: ImageApiResponse;
+  try {
+    body = JSON.parse(rawBody) as ImageApiResponse;
+  } catch {
+    const isHtml = /^\s*(?:<!doctype\s+html|<html)/i.test(rawBody);
+    if (isHtml) {
+      throw new Error(`O serviço de imagens devolveu uma página web (HTTP ${response.status}) em vez de uma resposta da API. O administrador deve verificar OPENAI_BASE_URL e o proxy.`);
+    }
+    throw new Error(`O serviço de imagens devolveu uma resposta inválida (HTTP ${response.status}). Tente novamente em alguns minutos.`);
+  }
+
+  if (!response.ok) {
+    if (body.error?.message) throw new Error(body.error.message);
+    if (response.status === 401) throw new Error("A chave da OpenAI foi recusada. O administrador deve revisar a configuração.");
+    if (response.status === 429) throw new Error("O limite da OpenAI foi atingido. Aguarde alguns minutos e tente novamente.");
+    throw new Error(`O serviço de imagens não conseguiu atender à solicitação (HTTP ${response.status}).`);
+  }
+  if (!body.data?.[0]?.b64_json) throw new Error("O serviço informou sucesso, mas não devolveu os dados da imagem.");
+  return body as ImageApiSuccess;
 }
 
 async function persistArtifact(db: Db, owner: ArtifactOwner, input: {
@@ -155,15 +190,13 @@ export async function generateImage(db: Db, owner: ArtifactOwner, input: ImageIn
   const startedAt = Date.now();
   try {
     const key = await getOpenAIKey(db);
-    const base = (process.env.OPENAI_BASE_URL ?? "https://api.openai.com").replace(/\/v1$/, "");
-    const response = await fetch(`${base}/v1/images/generations`, {
+    const response = await fetch(getOpenAIImageEndpoint(), {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-2", prompt: input.prompt, size: input.size, quality: input.quality, output_format: "png" }),
       signal: AbortSignal.timeout(300_000),
     });
-    const body = await response.json() as { data?: Array<{ b64_json?: string }>; error?: { message?: string } };
-    if (!response.ok || !body.data?.[0]?.b64_json) throw new Error(body.error?.message ?? "Falha ao gerar imagem");
+    const body = await readImageApiResponse(response);
     const artifact = await persistArtifact(db, owner, { buffer: Buffer.from(body.data[0].b64_json, "base64"), filename: `imagem-${Date.now()}.png`, mime: "image/png", kind: "image" });
     await recordGenerationUsage(db, { userId: owner.userId, conversationId: owner.conversationId, kind: "image", model: "gpt-image-2", durationMs: Date.now() - startedAt, success: true })
       .catch((error) => console.error("[artefato] não foi possível registrar o uso da imagem", error));
