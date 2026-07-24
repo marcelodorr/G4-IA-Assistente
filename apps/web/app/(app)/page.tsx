@@ -7,17 +7,19 @@ import { auth } from "@/lib/auth";
 import { filterUserModels, getUserAccess } from "@/lib/services/users";
 import { listUserIntegrations } from "@/lib/services/integrations";
 import { listProjects } from "@/lib/services/projects";
+import { getOwnProfile } from "@/lib/services/profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewChatPage({ searchParams }: { searchParams: Promise<{ prompt?: string; project?: string }> }) {
   const session = (await auth())!;
-  const [assistentes, settings, access, integrations, projects, params] = await Promise.all([
+  const [assistentes, settings, access, integrations, projects, profile, params] = await Promise.all([
     listAssistantsForUser(db, session.user.id),
     getSettings(db),
     getUserAccess(db, session.user.id),
     listUserIntegrations(db, session.user.id),
     listProjects(db, session.user.id),
+    getOwnProfile(db, session.user.id),
     searchParams,
   ]);
   // Só os campos necessários para o seletor chegam ao client — nunca o systemPrompt.
@@ -25,7 +27,15 @@ export default async function NewChatPage({ searchParams }: { searchParams: Prom
   const globallyEnabled = SUPPORTED_MODELS.filter((model) => !settings.disabledModels.includes(model));
   const models = filterUserModels(globallyEnabled, access.allowedModels);
   const defaultModel = models.includes(settings.defaultModel) ? settings.defaultModel : models[0] ?? null;
-  const integrationSuggestions = integrations.filter((item) => item.connected).flatMap((item) => item.examplePrompts.slice(0, 1));
+  const integrationSuggestions = profile.preferences.suggestedPrompts
+    ? integrations.filter((item) => item.connected).flatMap((item) => item.examplePrompts.slice(0, 1))
+    : [];
+  if (profile.preferences.suggestedPrompts && integrationSuggestions.length === 0) {
+    integrationSuggestions.push(
+      profile.preferences.jobTitle ? `Ajude-me a priorizar minhas atividades como ${profile.preferences.jobTitle}.` : "Ajude-me a organizar minhas prioridades de hoje.",
+      "Transforme minhas ideias em um plano de ação objetivo.",
+    );
+  }
   const initialPrompt = typeof params.prompt === "string" ? params.prompt.slice(0, 12_000) : "";
   const initialProjectId = typeof params.project === "string" && projects.some((project) => project.id === params.project) ? params.project : null;
   return <NewChat assistants={assistants} projects={projects.map(({ id, name }) => ({ id, name }))} initialProjectId={initialProjectId} defaultModel={defaultModel} models={models} initialPrompt={initialPrompt} integrationSuggestions={integrationSuggestions} />;

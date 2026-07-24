@@ -5,9 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, GripVertical, LogOut, MessageSquare, Plug, Settings2, Shield, Trash2, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { listConversations } from "@/lib/services/conversations";
 import type { listProjects } from "@/lib/services/projects";
@@ -17,99 +20,87 @@ import { UserUsageWidget } from "@/components/usage/user-usage-widget";
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
+type SidebarUser = Session["user"] & { username?: string | null; avatarUrl?: string | null };
 
-export function ConversationList({
-  conversations,
-  projects,
-  user,
-  usage,
-  liveUsage,
-}: {
-  conversations: ConversationRow[];
-  projects: ProjectRow[];
-  user: Session["user"];
-  usage: Usage | null;
-  liveUsage: boolean;
-}) {
+export function ConversationList({ conversations, projects, user, usage, liveUsage }: { conversations: ConversationRow[]; projects: ProjectRow[]; user: SidebarUser; usage: Usage | null; liveUsage: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [busca, setBusca] = useState("");
-  const [excluindoId, setExcluindoId] = useState<string | null>(null);
-  const [saindo, setSaindo] = useState(false);
+  const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [deleteConversation, setDeleteConversation] = useState<ConversationRow | null>(null);
+  const [deleteProject, setDeleteProject] = useState<ProjectRow | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const filtered = conversations.filter((conversation) => (conversation.title ?? "Nova conversa").toLowerCase().includes(search.toLowerCase()));
 
-  const filtradas = conversations.filter((conv) =>
-    (conv.title ?? "Nova conversa").toLowerCase().includes(busca.toLowerCase())
-  );
-  const withoutProject = filtradas.filter((conversation) => !conversation.projectId);
+  function toggleProject(id: string) {
+    setCollapsed((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
 
-  async function excluir(id: string) {
-    setExcluindoId(id);
-    const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
-    setExcluindoId(null);
-    if (!res.ok) return;
-    const eraAtiva = pathname === `/c/${id}`;
+  async function moveConversation(projectId: string | null) {
+    if (!draggingId) return;
+    const conversation = conversations.find((item) => item.id === draggingId);
+    setDropTarget(null); setDraggingId(null);
+    if (!conversation || conversation.projectId === projectId) return;
+    setBusy(conversation.id);
+    const response = await fetch(`/api/conversations/${conversation.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId }) });
+    setBusy(null);
+    if (!response.ok) return toast.error((await response.json().catch(() => ({}))).error ?? "Não foi possível mover o chat");
+    toast.success(projectId ? "Chat movido para o projeto" : "Chat movido para conversas avulsas");
     router.refresh();
-    if (eraAtiva) router.push("/");
   }
 
-  async function sair() {
-    setSaindo(true);
-    try {
-      // O redirecionamento calculado pelo Auth.js pode usar o host interno
-      // quando a aplicação está atrás do proxy do Dokploy. Encerramos a
-      // sessão sem redirect e navegamos por uma URL relativa à origem atual.
-      await signOut({ redirect: false });
-      window.location.assign("/login");
-    } catch {
-      setSaindo(false);
-    }
+  async function confirmDeleteConversation() {
+    if (!deleteConversation) return;
+    setBusy(deleteConversation.id);
+    const response = await fetch(`/api/conversations/${deleteConversation.id}`, { method: "DELETE" });
+    setBusy(null);
+    if (!response.ok) return toast.error("Não foi possível excluir o chat");
+    const wasActive = pathname === `/c/${deleteConversation.id}`;
+    setDeleteConversation(null); toast.success("Chat excluído"); router.refresh();
+    if (wasActive) router.push("/");
   }
 
-  function conversationItem(conv: ConversationRow) {
-    const href = `/c/${conv.id}`;
-    const ativa = pathname === href;
-    return <div key={conv.id} className="group/conversation relative"><Link href={href} className={cn("block truncate rounded-lg px-2.5 py-1.5 pr-7 text-sm transition-colors", ativa ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>{conv.title || "Nova conversa"}</Link><button type="button" onClick={() => excluir(conv.id)} disabled={excluindoId === conv.id} aria-label="Excluir conversa" className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-destructive focus:block group-hover/conversation:block group-focus-within/conversation:block"><Trash2 className="size-3.5" /></button></div>;
+  async function confirmDeleteProject() {
+    if (!deleteProject) return;
+    setBusy(deleteProject.id);
+    const response = await fetch(`/api/projects/${deleteProject.id}`, { method: "DELETE" });
+    setBusy(null);
+    if (!response.ok) return toast.error("Não foi possível excluir o projeto");
+    const wasActive = pathname === `/projetos/${deleteProject.id}`;
+    setDeleteProject(null); toast.success("Projeto excluído; os chats foram mantidos como avulsos"); router.refresh();
+    if (wasActive) router.push("/projetos");
   }
 
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="px-3 pb-2">
-        <Input
-          value={busca}
-          aria-label="Buscar conversas"
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar conversas..."
-        />
-      </div>
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-1">
-        {projects.map((project) => {
-          const projectConversations = filtradas.filter((conversation) => conversation.projectId === project.id);
-          if (projectConversations.length === 0 && busca) return null;
-          return <section key={project.id} className="pb-2"><div className="flex items-center justify-between px-2.5 py-1"><Link href={`/projetos/${project.id}`} className="truncate text-xs font-medium text-foreground hover:text-primary">{project.name}</Link><Link href={`/?project=${project.id}`} className="text-xs text-muted-foreground hover:text-primary" aria-label={`Nova conversa em ${project.name}`}>+</Link></div>{projectConversations.map(conversationItem)}{projectConversations.length === 0 && <p className="px-2.5 py-1 text-xs text-muted-foreground">Sem conversas</p>}</section>;
-        })}
-        {withoutProject.length > 0 && <section><p className="px-2.5 py-1 text-xs font-medium text-muted-foreground">Conversas avulsas</p>{withoutProject.map(conversationItem)}</section>}
-        {filtradas.length === 0 && (
-          <p className="px-2.5 py-2 text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
-        )}
-      </nav>
-      <div className="space-y-2 border-t p-3">
-        <UserUsageWidget initialUsage={usage} live={liveUsage} />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{user.name}</p>
-          <Link href="/integracoes" className="mr-3 text-xs text-muted-foreground hover:text-foreground">Integrações</Link>
-          {user.role === "admin" && (
-            <Link
-              href="/admin/usuarios"
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Administração
-            </Link>
-          )}
-        </div>
-        <Button variant="outline" size="sm" className="w-full" disabled={saindo} onClick={() => void sair()}>
-          {saindo ? "Saindo…" : "Sair"}
-        </Button>
-      </div>
-    </div>
-  );
+  async function logout() {
+    setSigningOut(true);
+    try { await signOut({ redirect: false }); window.location.assign("/login"); } catch { setSigningOut(false); }
+  }
+
+  function conversationItem(conversation: ConversationRow) {
+    const href = `/c/${conversation.id}`;
+    return <div key={conversation.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", conversation.id); setDraggingId(conversation.id); }} onDragEnd={() => { setDraggingId(null); setDropTarget(null); }} className={cn("group/chat relative flex items-center rounded-lg transition", pathname === href ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground", busy === conversation.id && "opacity-50", draggingId === conversation.id && "opacity-40")}><GripVertical className="ml-1 size-3 shrink-0 cursor-grab opacity-0 group-hover/chat:opacity-50" /><Link href={href} className="min-w-0 flex-1 truncate py-1.5 pl-1 pr-7 text-sm"><MessageSquare className="mr-1.5 inline size-3.5" />{conversation.title || "Nova conversa"}</Link><button type="button" onClick={() => setDeleteConversation(conversation)} aria-label={`Excluir ${conversation.title ?? "chat"}`} className="absolute right-1.5 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive md:opacity-0 md:group-hover/chat:opacity-100 md:focus:opacity-100"><Trash2 className="size-3.5" /></button></div>;
+  }
+
+  const dropProps = (target: string, projectId: string | null) => ({
+    onDragOver: (event: React.DragEvent) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTarget(target); },
+    onDragLeave: (event: React.DragEvent) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null); },
+    onDrop: (event: React.DragEvent) => { event.preventDefault(); void moveConversation(projectId); },
+  });
+
+  const standalone = filtered.filter((conversation) => !conversation.projectId);
+  return <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="px-3 pb-2"><Input value={search} aria-label="Buscar chats" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar chats..." /></div>
+    <nav className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="mb-1 flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"><span className="flex items-center gap-1.5"><Folder className="size-3.5" />Projetos</span><span>{projects.length}</span></div>
+      <div className="space-y-1">{projects.map((project) => { const items = filtered.filter((conversation) => conversation.projectId === project.id); const isCollapsed = collapsed.has(project.id); return <section key={project.id} {...dropProps(project.id, project.id)} className={cn("rounded-lg border border-transparent p-1 transition-colors", dropTarget === project.id && "border-primary bg-primary/10")}><div className="group/project flex items-center gap-1"><button type="button" onClick={() => toggleProject(project.id)} className="rounded p-1 text-muted-foreground hover:bg-accent" aria-label={isCollapsed ? `Expandir ${project.name}` : `Recolher ${project.name}`}>{isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}</button><Link href={`/projetos/${project.id}`} className="min-w-0 flex-1 truncate text-sm font-medium"><Folder className="mr-1.5 inline size-4 text-primary" />{project.name}</Link><span className="text-[10px] text-muted-foreground">{items.length}</span><Link href={`/?project=${project.id}`} className="rounded px-1 text-base leading-none text-muted-foreground hover:text-primary md:opacity-0 md:group-hover/project:opacity-100" aria-label={`Novo chat em ${project.name}`}>+</Link><button type="button" onClick={() => setDeleteProject(project)} className="rounded p-1 text-muted-foreground hover:text-destructive md:opacity-0 md:group-hover/project:opacity-100 md:focus:opacity-100" aria-label={`Excluir projeto ${project.name}`}><Trash2 className="size-3" /></button></div>{!isCollapsed && <div className="mt-1 space-y-0.5 border-l border-border/60 pl-2 ml-2">{items.map(conversationItem)}{items.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground">Arraste um chat para cá</p>}</div>}</section>; })}</div>
+      <section {...dropProps("standalone", null)} className={cn("mt-3 rounded-lg border border-transparent p-1 transition-colors", dropTarget === "standalone" && "border-primary bg-primary/10")}><div className="mb-1 flex items-center justify-between px-1 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"><span className="flex items-center gap-1.5"><MessageSquare className="size-3.5" />Chats avulsos</span><span>{standalone.length}</span></div><div className="space-y-0.5">{standalone.map(conversationItem)}{standalone.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground">Arraste chats para remover do projeto</p>}</div></section>
+      {filtered.length === 0 && search && <p className="p-3 text-center text-sm text-muted-foreground">Nenhum chat encontrado.</p>}
+    </nav>
+    <div className="space-y-2 border-t p-3"><UserUsageWidget initialUsage={usage} live={liveUsage} /><div className="flex items-center gap-2"><Avatar size="sm"><AvatarImage src={user.avatarUrl ?? undefined} /><AvatarFallback>{user.name?.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{user.name}</p><p className="truncate text-[11px] text-muted-foreground">{user.username ? `@${user.username}` : user.email}</p></div><div className="flex"><Button asChild size="icon-sm" variant="ghost" title="Meu perfil"><Link href="/perfil" aria-label="Meu perfil"><UserRound /></Link></Button><Button asChild size="icon-sm" variant="ghost" title="Personalização"><Link href="/personalizacao" aria-label="Personalização"><Settings2 /></Link></Button><Button asChild size="icon-sm" variant="ghost" title="Integrações"><Link href="/integracoes" aria-label="Integrações"><Plug /></Link></Button>{user.role === "admin" && <Button asChild size="icon-sm" variant="ghost" title="Administração"><Link href="/admin/usuarios" aria-label="Administração"><Shield /></Link></Button>}</div></div><Button variant="outline" size="sm" className="w-full" disabled={signingOut} onClick={() => void logout()}><LogOut />{signingOut ? "Saindo…" : "Sair"}</Button></div>
+    <Dialog open={Boolean(deleteConversation)} onOpenChange={(open) => { if (!open) setDeleteConversation(null); }}><DialogContent><DialogHeader><DialogTitle>Excluir este chat?</DialogTitle><DialogDescription>“{deleteConversation?.title ?? "Nova conversa"}” e todo o histórico serão removidos permanentemente.</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose><Button variant="destructive" disabled={busy === deleteConversation?.id} onClick={() => void confirmDeleteConversation()}>{busy ? "Excluindo…" : "Excluir chat"}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(deleteProject)} onOpenChange={(open) => { if (!open) setDeleteProject(null); }}><DialogContent><DialogHeader><DialogTitle>Excluir o projeto?</DialogTitle><DialogDescription>O contexto, os documentos e as skills de “{deleteProject?.name}” serão removidos. Os chats serão preservados como conversas avulsas.</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose><Button variant="destructive" disabled={busy === deleteProject?.id} onClick={() => void confirmDeleteProject()}>{busy ? "Excluindo…" : "Excluir projeto"}</Button></DialogFooter></DialogContent></Dialog>
+  </div>;
 }

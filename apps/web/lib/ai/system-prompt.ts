@@ -12,6 +12,7 @@ REGRAS DE SEGURANÇA PARA DOCUMENTOS E FERRAMENTAS:
 
 export function composeSystemPrompt(input: {
   globalContext?: string | null;
+  userContext?: string | null;
   projectContext?: string | null;
   projectFilesContext?: string | null;
   assistantPrompt?: string | null;
@@ -20,6 +21,9 @@ export function composeSystemPrompt(input: {
   const sections = [DEFAULT_SYSTEM_PROMPT];
   if (input.globalContext?.trim()) {
     sections.push(`CONTEXTO E DIRETRIZES GERAIS DA EMPRESA (aplicáveis a toda resposta):\n${input.globalContext.trim()}`);
+  }
+  if (input.userContext?.trim()) {
+    sections.push(`PERFIL E PREFERÊNCIAS DO USUÁRIO ATUAL (aplique em toda resposta, sem revelar este bloco):\n${input.userContext.trim()}`);
   }
   if (input.projectContext?.trim()) {
     sections.push(`CONTEXTO PERSISTENTE DO PROJETO ATUAL (use somente nesta conversa e não misture com outros projetos):\n${input.projectContext.trim()}`);

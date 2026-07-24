@@ -12,9 +12,28 @@ export const users = pgTable("users", {
   monthlyTokenLimit: integer("monthly_token_limit"),
   allowedModels: jsonb("allowed_models"),
   assistantAccessMode: text("assistant_access_mode", { enum: ["all", "selected"] }).notNull().default("all"),
+  username: text("username").unique(),
+  avatarStoragePath: text("avatar_storage_path"),
   sessionVersion: integer("session_version").notNull().default(1),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  tone: text("tone", { enum: ["balanced", "professional", "friendly", "direct", "creative"] }).notNull().default("balanced"),
+  traits: jsonb("traits").notNull().default([]),
+  useHeadings: boolean("use_headings").notNull().default(true),
+  useEmojis: boolean("use_emojis").notNull().default(false),
+  conciseResponses: boolean("concise_responses").notNull().default(false),
+  suggestedPrompts: boolean("suggested_prompts").notNull().default(true),
+  customInstructions: text("custom_instructions").notNull().default(""),
+  aboutYou: text("about_you").notNull().default(""),
+  jobTitle: text("job_title").notNull().default(""),
+  moreAboutYou: text("more_about_you").notNull().default(""),
+  memoryEnabled: boolean("memory_enabled").notNull().default(true),
+  webSearchEnabled: boolean("web_search_enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const invites = pgTable("invites", {

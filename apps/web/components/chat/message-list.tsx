@@ -64,6 +64,7 @@ function ToolChip({ part }: { part: MessagePart }) {
     consultarPipedrive: "Consultando Pipedrive",
     consultarApify: "Consultando Apify",
     consultarJira: "Consultando Jira",
+    web_search: "Pesquisando na web",
   };
   if (statusUrl && done && !failed) return <ArtifactJobChip statusUrl={statusUrl} />;
   if (downloadUrl && done && !failed) return <a className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:underline" href={downloadUrl}>↓ Baixar {filename}</a>;
@@ -90,6 +91,9 @@ function AssistantContent({ parts }: { parts: MessagePart[] }) {
     } else if (part.type.startsWith("tool-")) {
       flush();
       nodes.push(<ToolChip key={key++} part={part} />);
+    } else if (part.type === "source-url" && /^https?:\/\//.test(part.url)) {
+      flush();
+      nodes.push(<a key={key++} href={part.url} target="_blank" rel="noreferrer" className="mb-2 mr-2 inline-flex max-w-full truncate rounded-full border px-3 py-1 text-xs text-primary hover:bg-primary/5 hover:underline">Fonte: {part.title || new URL(part.url).hostname}</a>);
     }
     // outras parts (reasoning, source, step-start, etc.) são ignoradas aqui
   }

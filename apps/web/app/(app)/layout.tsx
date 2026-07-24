@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) redirect("/login");
   // A sessão JWT continua válida após a desativação do usuário; confirma no banco
   // a cada navegação para não deixar um usuário desativado usar o app.
-  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, session.user.id));
+  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion, name: users.name, username: users.username, avatarStoragePath: users.avatarStoragePath }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
   const [convs, projects, usage] = await Promise.all([
     listConversations(db, session.user.id),
@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   return (
     <div className="flex h-screen">
-      <Sidebar user={session.user} conversations={convs} projects={projects} usage={usage} />
+      <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null }} conversations={convs} projects={projects} usage={usage} />
       <main className="min-w-0 flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
     </div>
   );

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { Menu } from "lucide-react";
+import { FolderKanban, Menu, MessageSquarePlus } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { ConversationList } from "@/components/sidebar/conversation-list";
@@ -14,10 +14,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
-type Props = { user: Session["user"]; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage | null };
+type Props = { user: Session["user"] & { username?: string | null; avatarUrl?: string | null }; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage | null };
 
 function SidebarContent({ user, conversations, projects, usage, live }: Props & { live: boolean }) {
-  return <><div className="p-4"><Logo className="h-6 w-auto" /></div><div className="space-y-2 px-3 pb-2"><Button asChild className="w-full"><Link href="/">Nova conversa</Link></Button><Button asChild variant="outline" className="w-full"><Link href="/projetos">Projetos</Link></Button></div><ConversationList conversations={conversations} projects={projects} user={user} usage={usage} liveUsage={live} /></>;
+  return <><div className="p-4"><Logo className="h-6 w-auto" /></div><div className="grid grid-cols-[1fr_auto] gap-2 px-3 pb-3"><Button asChild className="justify-start"><Link href="/"><MessageSquarePlus />Novo chat</Link></Button><Button asChild variant="outline" size="icon" title="Gerenciar projetos"><Link href="/projetos" aria-label="Gerenciar projetos"><FolderKanban /></Link></Button></div><ConversationList conversations={conversations} projects={projects} user={user} usage={usage} liveUsage={live} /></>;
 }
 
 export function Sidebar(props: Props) {

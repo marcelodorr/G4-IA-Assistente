@@ -33,6 +33,7 @@ import { INTEGRATIONS } from "@/lib/integrations/catalog";
 import { getPersistentProjectFileContext, getProject } from "@/lib/services/projects";
 import { KB_MIMES } from "@/lib/files/storage";
 import { startGlobalContextIngestion } from "@/lib/rag/ingest";
+import { buildPersonalContext, getOwnProfile } from "@/lib/services/profile";
 
 export const maxDuration = 150;
 
@@ -55,10 +56,11 @@ export const POST = apiHandler(async (req) => {
   const got = await getConversation(db, body.conversationId, session.user.id);
   if (!got) return Response.json({ error: "Conversa não encontrada" }, { status: 404 });
 
-  const [settings, userAccess, globalContext] = await Promise.all([
+  const [settings, userAccess, globalContext, ownProfile] = await Promise.all([
     getSettings(db),
     getUserAccess(db, session.user.id),
     getGlobalContext(db),
+    getOwnProfile(db, session.user.id),
   ]);
   const assistant = got.conversation.assistantId
     ? (await db.select().from(assistants).where(eq(assistants.id, got.conversation.assistantId)))[0]
@@ -84,6 +86,7 @@ export const POST = apiHandler(async (req) => {
   const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt].filter(Boolean).join("\n\n");
   const systemPrompt = composeSystemPrompt({
     globalContext,
+    userContext: buildPersonalContext(ownProfile),
     projectContext: project?.context,
     projectFilesContext,
     assistantPrompt,
@@ -193,7 +196,10 @@ export const POST = apiHandler(async (req) => {
       integrationCalls += 1;
       if (integrationCalls > 4) throw new Error("Limite de consultas a integrações nesta resposta atingido");
     } });
-    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools, ...integrationTools } : undefined;
+    const webTools: ToolSet = ownProfile.preferences.webSearchEnabled ? {
+      web_search: openai.tools.webSearch({ searchContextSize: "medium", externalWebAccess: true }),
+    } : {};
+    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools, ...integrationTools, ...webTools } : undefined;
     let failurePersistence: Promise<void> | null = null;
     const markInterrupted = (reason: string) => {
       failurePersistence ??= (async () => {
@@ -206,7 +212,7 @@ export const POST = apiHandler(async (req) => {
     };
 
     const result = streamText({
-      model: openai.chat(modelId),
+      model: ownProfile.preferences.webSearchEnabled ? openai(modelId) : openai.chat(modelId),
       system: systemPrompt,
       messages: modelMessages,
       maxOutputTokens,
