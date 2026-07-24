@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { settings, users } from "@/lib/db/schema";
 import { isSetupCompleted } from "@/lib/services/setup";
 import { listConversations } from "@/lib/services/conversations";
 import { Sidebar } from "@/components/sidebar/sidebar";
@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a cada navegação para não deixar um usuário desativado usar o app.
   const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion, name: users.name, username: users.username, avatarStoragePath: users.avatarStoragePath }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
-  const [convs, projects, usage] = await Promise.all([
+  const [convs, projects, usage, systemSettings] = await Promise.all([
     listConversations(db, session.user.id),
     listProjects(db, session.user.id),
     getUserUsageSummary(db, session.user.id).catch((error) => {
@@ -27,10 +27,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       console.error("[layout] Falha ao carregar o uso individual", error);
       return null;
     }),
+    db.select({ systemVersion: settings.systemVersion }).from(settings).where(eq(settings.id, 1)).then((rows) => rows[0]).catch((error) => {
+      console.error("[layout] Falha ao carregar a versão do sistema", error);
+      return null;
+    }),
   ]);
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden">
-      <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null }} conversations={convs} projects={projects} usage={usage} />
+      <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null }} conversations={convs} projects={projects} usage={usage} systemVersion={systemSettings?.systemVersion ?? process.env.APP_VERSION ?? "0.1.0"} />
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">{children}</main>
     </div>
   );

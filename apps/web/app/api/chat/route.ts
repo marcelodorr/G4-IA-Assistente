@@ -21,6 +21,7 @@ import { makeKnowledgeTool } from "@/lib/ai/knowledge-tool";
 import { assistants, chatUploads, globalContextFiles } from "@/lib/db/schema";
 import { hasReadyKnowledge } from "@/lib/rag/search";
 import { getPublicError } from "@/lib/errors/public-error";
+import { logSystemError } from "@/lib/services/system-errors";
 import { canUserAccessAssistant } from "@/lib/services/assistants";
 import { filterUserModels, getUserAccess } from "@/lib/services/users";
 import { SUPPORTED_MODELS } from "@/lib/ai/models";
@@ -237,7 +238,10 @@ export const POST = apiHandler(async (req) => {
       stopWhen: stepCountIs(CHAT_LIMITS.maxToolCalls + 1),
       tools,
       timeout: { totalMs: CHAT_LIMITS.totalTimeoutMs, toolMs: 120_000 },
-      onError: ({ error }) => markInterrupted(getPublicError(error).message),
+      onError: ({ error }) => {
+        void logSystemError(db, { error, userId: session.user.id, source: "Resposta da IA", path: `/c/${body.conversationId}` });
+        return markInterrupted(getPublicError(error).message);
+      },
       onAbort: () => markInterrupted("Resposta interrompida"),
     });
 
@@ -277,7 +281,10 @@ export const POST = apiHandler(async (req) => {
           if (title) await setConversationTitle(db, body.conversationId as string, title);
         }
       },
-      onError: (error) => getPublicError(error).message,
+      onError: (error) => {
+        void logSystemError(db, { error, userId: session.user.id, source: "Transmissão da resposta", path: `/c/${body.conversationId}` });
+        return getPublicError(error).message;
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao iniciar resposta";

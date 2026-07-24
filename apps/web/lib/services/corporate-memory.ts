@@ -4,6 +4,7 @@ import { corporateMemories, users } from "@/lib/db/schema";
 import { getProvider } from "@/lib/ai/provider";
 import { recordEmbeddingUsage } from "@/lib/services/usage";
 import type { Db } from "@/lib/db";
+import { logSystemError } from "@/lib/services/system-errors";
 
 export async function processCorporateMemory(db: Db, id: string) {
   const [memory] = await db.select().from(corporateMemories).where(eq(corporateMemories.id, id));
@@ -19,6 +20,7 @@ export async function processCorporateMemory(db: Db, id: string) {
     const message = error instanceof Error ? error.message : String(error);
     await db.update(corporateMemories).set({ status: "error", error: message }).where(eq(corporateMemories.id, id));
     if (memory.userId) await recordEmbeddingUsage(db, { userId: memory.userId, tokens: 0, durationMs: Date.now() - startedAt, success: false });
+    await logSystemError(db, { error, userId: memory.userId, source: "Memória corporativa", path: "/admin/contexto", severity: "warning" });
   }
 }
 

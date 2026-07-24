@@ -8,6 +8,7 @@ import { chunkText } from "./chunking";
 import { getProvider } from "@/lib/ai/provider";
 import type { Db } from "@/lib/db";
 import { recordEmbeddingUsage } from "@/lib/services/usage";
+import { logSystemError } from "@/lib/services/system-errors";
 
 type Deps = {
   embed: (texts: string[]) => Promise<number[][]>;
@@ -53,6 +54,7 @@ export async function ingestFile(db: Db, fileId: string, deps: Deps) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await db.update(assistantFiles).set({ status: "error", error: msg }).where(eq(assistantFiles.id, fileId));
+    await logSystemError(db, { error: e, source: "Documento de assistente", path: `/admin/assistentes/${file.assistantId}` });
   }
 }
 
@@ -108,6 +110,7 @@ export async function ingestGlobalContextFile(db: Db, fileId: string, deps: Deps
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await db.update(globalContextFiles).set({ status: "error", error: message }).where(eq(globalContextFiles.id, fileId));
+    await logSystemError(db, { error, userId: file.createdBy, source: "Contexto geral", path: "/admin/contexto" });
   }
 }
 
@@ -159,6 +162,8 @@ export async function ingestProjectFile(db: Db, fileId: string, deps: Deps) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await db.update(projectFiles).set({ status: "error", error: message }).where(eq(projectFiles.id, fileId));
+    const [owner] = await db.select({ userId: projects.userId }).from(projects).where(eq(projects.id, file.projectId));
+    await logSystemError(db, { error, userId: owner?.userId, source: "Documento de projeto", path: `/projetos/${file.projectId}` });
   }
 }
 

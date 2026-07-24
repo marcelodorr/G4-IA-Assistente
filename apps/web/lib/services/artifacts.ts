@@ -8,6 +8,7 @@ import { getOpenAIKey } from "@/lib/services/settings";
 import { saveArtifact } from "@/lib/files/storage";
 import type { Db } from "@/lib/db";
 import { recordGenerationUsage } from "@/lib/services/usage";
+import { logSystemError } from "@/lib/services/system-errors";
 
 type ArtifactOwner = { userId: string; conversationId: string; assistantId?: string | null };
 type ImageInput = { prompt: string; size: "1024x1024" | "1024x1536" | "1536x1024"; quality: "low" | "medium" | "high" };
@@ -203,6 +204,7 @@ export async function processImageJob(db: Db, id: string) {
     await db.update(artifactJobs).set({ status: "ready", artifactId: artifact.id, finishedAt: new Date() }).where(eq(artifactJobs.id, id));
   } catch (error) {
     await db.update(artifactJobs).set({ status: "error", error: publicImageError(error), finishedAt: new Date() }).where(eq(artifactJobs.id, id));
+    await logSystemError(db, { error, userId: job.userId, source: "Geração de imagem", path: job.conversationId ? `/c/${job.conversationId}` : null });
   }
 }
 

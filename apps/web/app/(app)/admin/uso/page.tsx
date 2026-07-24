@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TriangleAlert } from "lucide-react";
 import { RefreshButton } from "@/components/admin/refresh-button";
+import { logSystemError } from "@/lib/services/system-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function UsagePage() {
     data = await getUsageDashboard(db);
   } catch (error) {
     console.error("[admin/uso] Falha ao carregar o painel de uso", error);
+    await logSystemError(db, { error, source: "Painel de uso de IA", path: "/admin/uso" });
     return (
       <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div>
@@ -30,6 +32,7 @@ export default async function UsagePage() {
   }
   const settings = await getSettings(db).catch((error) => {
     console.error("[admin/uso] Falha ao carregar limites globais", error);
+    void logSystemError(db, { error, source: "Cotas de uso de IA", path: "/admin/uso", severity: "warning" });
     return { dailyTokenLimit: 200_000, weeklyTokenLimit: 1_000_000, monthlyTokenLimit: 4_000_000 };
   });
   const usage = data;

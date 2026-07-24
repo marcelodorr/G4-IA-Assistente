@@ -28,6 +28,7 @@ export async function getSettings(db: Db) {
     maxOutputTokens: row?.maxOutputTokens ?? 2_048,
     disabledModels,
     autoLearnEnabled: row?.autoLearnEnabled ?? true,
+    systemVersion: row?.systemVersion ?? process.env.APP_VERSION ?? "0.1.0",
   };
 }
 
@@ -73,6 +74,14 @@ export async function setAiControls(db: Db | Tx, input: {
     maxOutputTokens: input.maxOutputTokens,
     disabledModels,
   });
+}
+
+export async function setSystemVersion(db: Db | Tx, version: string) {
+  const normalized = version.trim().replace(/^v(?=\d)/i, "");
+  if (!/^[a-z0-9][a-z0-9._+-]{0,39}$/i.test(normalized)) {
+    throw new Error("Informe uma versão válida, como 1.0.0 ou 2026.07.1");
+  }
+  await upsert(db, { systemVersion: normalized });
 }
 
 export async function markSetupCompleted(db: Db | Tx) {

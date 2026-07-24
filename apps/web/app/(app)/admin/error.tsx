@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { reportClientError } from "@/components/system/error-reporter";
 
 export default function AdminError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[admin] Erro inesperado", error);
+    reportClientError(error);
   }, [error]);
 
   return (

@@ -60,8 +60,35 @@ export const settings = pgTable("settings", {
   disabledModels: jsonb("disabled_models").notNull().default([]),
   globalContext: text("global_context").notNull().default(""),
   autoLearnEnabled: boolean("auto_learn_enabled").notNull().default(true),
+  systemVersion: text("system_version").notNull().default("0.1.0"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const systemErrors = pgTable("system_errors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  source: text("source").notNull(),
+  path: text("path"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  suggestion: text("suggestion").notNull(),
+  code: text("code").notNull().default("INTERNAL_ERROR"),
+  severity: text("severity", { enum: ["warning", "error"] }).notNull().default("error"),
+  technicalDetails: text("technical_details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("system_errors_user_created_idx").on(t.userId, t.createdAt),
+  index("system_errors_created_idx").on(t.createdAt),
+]);
+
+export const systemErrorReads = pgTable("system_error_reads", {
+  errorId: uuid("error_id").notNull().references(() => systemErrors.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  readAt: timestamp("read_at").notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.errorId, t.userId] }),
+  index("system_error_reads_user_idx").on(t.userId),
+]);
 
 export const assistants = pgTable("assistants", {
   id: uuid("id").primaryKey().defaultRandom(),

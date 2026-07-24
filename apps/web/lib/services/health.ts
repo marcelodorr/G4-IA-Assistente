@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { artifactJobs, assistantFiles, aiUsage, corporateMemories, globalContextFiles, projectFiles } from "@/lib/db/schema";
 import { uploadsDir } from "@/lib/files/storage";
 import { getOpenAIKey, getSettings } from "@/lib/services/settings";
+import { logSystemError } from "@/lib/services/system-errors";
 
 type Check = { status: "ok" | "warning" | "error"; message: string; durationMs?: number };
 type SchemaCheck = Check & { missing: string[] };
@@ -26,9 +27,11 @@ async function schemaCheck(): Promise<SchemaCheck> {
         to_regclass('public.ai_usage') is not null as "aiUsage",
         to_regclass('public.project_files') is not null as "projectFiles",
         to_regclass('public.artifact_jobs') is not null as "artifactJobs",
+        to_regclass('public.system_errors') is not null as "systemErrors",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'daily_token_limit') as "settingsDaily",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'weekly_token_limit') as "settingsWeekly",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'monthly_token_limit') as "settingsMonthly",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'system_version') as "settingsVersion",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'daily_token_limit') as "usersDaily",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'weekly_token_limit') as "usersWeekly",
         exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'monthly_token_limit') as "usersMonthly"
@@ -38,9 +41,11 @@ async function schemaCheck(): Promise<SchemaCheck> {
       ["aiUsage", "tabela ai_usage"],
       ["projectFiles", "tabela project_files"],
       ["artifactJobs", "tabela artifact_jobs"],
+      ["systemErrors", "tabela system_errors"],
       ["settingsDaily", "settings.daily_token_limit"],
       ["settingsWeekly", "settings.weekly_token_limit"],
       ["settingsMonthly", "settings.monthly_token_limit"],
+      ["settingsVersion", "settings.system_version"],
       ["usersDaily", "users.daily_token_limit"],
       ["usersWeekly", "users.weekly_token_limit"],
       ["usersMonthly", "users.monthly_token_limit"],
@@ -133,6 +138,7 @@ export async function getAdminHealth() {
         return await query();
       } catch (error) {
         console.error(`[admin/saude] Falha ao consultar ${label}`, error);
+        await logSystemError(db, { error, source: `Saúde: ${label}`, path: "/admin/saude", severity: "warning" });
         unavailable.push(label);
         return fallback;
       }

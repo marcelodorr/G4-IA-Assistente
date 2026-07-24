@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { getPublicError } from "@/lib/errors/public-error";
+import { logSystemError } from "@/lib/services/system-errors";
 
 export async function requireSession() {
   const session = await auth();
@@ -29,6 +30,16 @@ export function apiHandler(fn: (req: Request, ctx: RouteContext) => Promise<Resp
     catch (e) {
       if (e instanceof Response) return e;
       const safe = getPublicError(e);
+      const path = new URL(req.url).pathname;
+      if (safe.status >= 500 && path !== "/api/notifications") {
+        const session = await auth().catch(() => null);
+        await logSystemError(db, {
+          error: e,
+          userId: session?.user?.id ?? null,
+          source: `API ${req.method}`,
+          path,
+        });
+      }
       if (safe.code !== "INTERNAL_ERROR") {
         console.error(e);
         return Response.json({ error: safe.message, code: safe.code }, { status: safe.status });

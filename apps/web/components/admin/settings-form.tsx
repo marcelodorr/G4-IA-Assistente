@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { MODEL_POLICIES } from "@/lib/ai/models";
 import type { getSettings } from "@/lib/services/settings";
+import { useRouter } from "next/navigation";
 
 type AiSettings = Awaited<ReturnType<typeof getSettings>>;
 
 export function SettingsForm({ settings }: { settings: AiSettings }) {
+  const router = useRouter();
   const [openaiKey, setOpenaiKey] = useState("");
   const [modelo, setModelo] = useState(settings.defaultModel);
   const [dailyTokenLimit, setDailyTokenLimit] = useState(settings.dailyTokenLimit);
@@ -19,6 +21,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
   const [monthlyTokenLimit, setMonthlyTokenLimit] = useState(settings.monthlyTokenLimit);
   const [maxOutputTokens, setMaxOutputTokens] = useState(settings.maxOutputTokens);
   const [disabledModels, setDisabledModels] = useState(settings.disabledModels);
+  const [systemVersion, setSystemVersion] = useState(settings.systemVersion);
   const [salvando, setSalvando] = useState(false);
 
   function toggleModel(model: string) {
@@ -29,7 +32,8 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     setSalvando(true);
     const res = await fetch("/api/settings", {
       method: "PATCH",
-      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels, systemVersion }),
     });
     setSalvando(false);
     if (!res.ok) {
@@ -39,10 +43,22 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     }
     setOpenaiKey("");
     toast.success("Configurações salvas");
+    router.refresh();
   }
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Identificação do sistema</CardTitle>
+          <CardDescription>A versão aparece ao lado do logotipo para todos os usuários.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="settings-system-version">Versão</Label>
+          <Input id="settings-system-version" value={systemVersion} maxLength={40} onChange={(event) => setSystemVersion(event.target.value)} placeholder="Ex.: 1.0.0" />
+          <p className="text-xs text-muted-foreground">Use letras, números, ponto, hífen, sublinhado ou “+”.</p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>OpenAI</CardTitle>
