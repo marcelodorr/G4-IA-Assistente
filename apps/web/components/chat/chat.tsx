@@ -96,15 +96,15 @@ export function Chat({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b bg-primary/5 px-4 py-2 text-sm text-muted-foreground"><span className="shrink-0">Projeto:</span><Select disabled={status === "streaming" || status === "submitted"} value={project?.id ?? SEM_PROJETO} onValueChange={(value) => void moveToProject(value === SEM_PROJETO ? null : value)}><SelectTrigger className="h-8 max-w-64 bg-background" aria-label="Mover conversa para projeto"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={SEM_PROJETO}>Sem projeto</SelectItem>{projects.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>{project && <><span className="hidden sm:inline">contexto persistente ativo</span><Link href={`/projetos/${project.id}`} className="text-primary hover:underline">Configurar</Link></>}</div>
+      <div className="flex flex-wrap items-center gap-2 border-b bg-primary/5 px-3 py-2 text-sm text-muted-foreground sm:px-4"><span className="shrink-0">Projeto:</span><Select disabled={status === "streaming" || status === "submitted"} value={project?.id ?? SEM_PROJETO} onValueChange={(value) => void moveToProject(value === SEM_PROJETO ? null : value)}><SelectTrigger className="h-8 min-w-0 flex-1 bg-background sm:max-w-64 sm:flex-none" aria-label="Mover conversa para projeto"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={SEM_PROJETO}>Sem projeto</SelectItem>{projects.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>{project && <><span className="hidden sm:inline">contexto persistente ativo</span><Link href={`/projetos/${project.id}`} className="text-primary hover:underline">Configurar</Link></>}</div>
       {assistantName && (
-        <div className="border-b px-4 py-2 text-sm text-muted-foreground">
+        <div className="border-b px-3 py-2 text-sm text-muted-foreground sm:px-4">
           Assistente: <span className="text-primary">{assistantName}</span>
         </div>
       )}
       {integrationNames.length > 0 && (
-        <div className="border-b bg-secondary/20 px-4 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Integrações prontas:</span> {integrationNames.join(", ")}. Use o seletor próximo à mensagem para escolher uma plataforma ou mantenha em Automático. <Link href="/integracoes" className="text-primary hover:underline">Ver exemplos</Link>
+        <div className="border-b bg-secondary/20 px-3 py-2 text-xs text-muted-foreground sm:px-4">
+          <span className="font-medium text-foreground">Integrações prontas:</span> <span className="sm:hidden">{integrationNames.length} disponível(is). Selecione abaixo. </span><span className="hidden sm:inline">{integrationNames.join(", ")}. Use o seletor próximo à mensagem para escolher uma plataforma ou mantenha em Automático. </span><Link href="/integracoes" className="text-primary hover:underline">Ver exemplos</Link>
         </div>
       )}
       <MessageList messages={messages} streaming={status === "streaming"} interruptedMessageIds={interruptedMessageIds} />

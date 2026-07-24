@@ -15,7 +15,7 @@ export default async function UsagePage() {
   } catch (error) {
     console.error("[admin/uso] Falha ao carregar o painel de uso", error);
     return (
-      <main className="mx-auto max-w-6xl space-y-6 p-6">
+      <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div>
         <Card>
           <CardHeader><CardTitle>Não foi possível carregar os dados de uso</CardTitle></CardHeader>
@@ -30,7 +30,7 @@ export default async function UsagePage() {
   const usage = data;
   const totalTokens = Number(usage.totals.inputTokens) + Number(usage.totals.outputTokens);
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div>
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-sm">Tokens</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{totalTokens.toLocaleString("pt-BR")}</CardContent></Card>

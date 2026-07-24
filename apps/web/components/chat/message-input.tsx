@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { CHAT_LIMITS } from "@/lib/ai/chat-policy";
 import { Input } from "@/components/ui/input";
-import { LinkIcon } from "lucide-react";
+import { LinkIcon, Paperclip, SendHorizontal } from "lucide-react";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/files/policy";
 import { ChatCapabilitySelectors, type ChatControls, type IntegrationOption, type SkillOption } from "./chat-capability-selectors";
 
@@ -98,7 +98,7 @@ export function MessageInput({
   }
 
   return (
-    <div className="border-t p-4">
+    <div className="border-t px-2.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:p-4">
       <ChatCapabilitySelectors integrations={integrations} skills={skills} controls={effectiveControls} onChange={setControls} defaultIntegrationId={defaultIntegrationId} />
       {suggestions.length > 0 && !text && (
         <div className="mb-3 space-y-1.5">
@@ -107,24 +107,24 @@ export function MessageInput({
         </div>
       )}
       {mostrarLink && (
-        <div className="mb-2 flex gap-2">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row">
           <Input type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void attachLink(); } }} placeholder="https://www.exemplo.com.br/pagina" autoFocus />
-          <Button variant="outline" disabled={enviandoLink || !linkUrl.trim()} onClick={() => void attachLink()}>{enviandoLink ? "Capturando..." : "Adicionar"}</Button>
+          <Button className="w-full sm:w-auto" variant="outline" disabled={enviandoLink || !linkUrl.trim()} onClick={() => void attachLink()}>{enviandoLink ? "Capturando..." : "Adicionar"}</Button>
         </div>
       )}
       {files.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {files.map((f, i) => (
-            <span key={i} className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs">
-              {f.filename}
-              <button onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label="Remover">
+            <span key={i} className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs">
+              <span className="truncate">{f.filename}</span>
+              <button className="shrink-0" onClick={() => setFiles(files.filter((_, j) => j !== i))} aria-label="Remover">
                 ×
               </button>
             </span>
           ))}
         </div>
       )}
-      <div className="flex items-end gap-2">
+      <div className="rounded-xl border bg-background p-2 focus-within:ring-2 focus-within:ring-ring/40">
         <input
           ref={inputRef}
           type="file"
@@ -132,16 +132,6 @@ export function MessageInput({
           accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml,.webp"
           onChange={attach}
         />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => inputRef.current?.click()}
-          disabled={enviandoArquivo}
-          aria-label="Anexar arquivo"
-        >
-          +
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -154,15 +144,19 @@ export function MessageInput({
           placeholder="Envie uma mensagem..."
           rows={1}
           maxLength={CHAT_LIMITS.maxMessageChars}
-          className="max-h-40 min-h-[44px] resize-none"
+          className="max-h-40 min-h-[44px] resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
-        <Button onClick={submit} disabled={disabled}>
-          Enviar
-        </Button>
+        <div className="mt-1 flex items-center gap-1">
+          <Button className="size-10 sm:size-8" variant="ghost" size="icon" onClick={() => inputRef.current?.click()} disabled={enviandoArquivo} aria-label="Anexar arquivo"><Paperclip /></Button>
+          <Button className="size-10 sm:size-8" variant={mostrarLink ? "secondary" : "ghost"} size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
+          <div className="flex-1" />
+          <Button className="h-10 px-3 sm:h-8" onClick={submit} disabled={disabled} aria-label="Enviar mensagem"><SendHorizontal /><span className="hidden sm:inline">Enviar</span></Button>
+        </div>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
+      <p className="mt-2 hidden text-center text-xs text-muted-foreground sm:block">
         Até {CHAT_LIMITS.maxMessageChars.toLocaleString("pt-BR")} caracteres, {CHAT_LIMITS.maxAttachments} anexos e {MAX_UPLOAD_LABEL} por arquivo. O Sequor IA Assistente pode cometer erros.
       </p>
+      <p className="mt-1 text-center text-[11px] text-muted-foreground sm:hidden">O Sequor IA Assistente pode cometer erros.</p>
     </div>
   );
 }

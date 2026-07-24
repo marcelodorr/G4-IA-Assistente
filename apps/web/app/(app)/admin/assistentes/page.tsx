@@ -22,7 +22,7 @@ export default async function AdminAssistentesPage() {
   const contagemPorAssistente = new Map(contagens.map((c) => [c.assistantId, c.total]));
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
+    <main className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-xl font-medium">Assistentes</h1>

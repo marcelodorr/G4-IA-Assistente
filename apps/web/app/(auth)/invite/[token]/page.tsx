@@ -10,7 +10,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const { token } = await params;
   const invite = await getValidInvite(db, token);
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-dvh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center space-y-3">
           <Logo />

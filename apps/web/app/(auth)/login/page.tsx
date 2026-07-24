@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage() {
   if (!(await isSetupCompleted(db))) redirect("/setup");
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-dvh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center space-y-4">
           <Logo />

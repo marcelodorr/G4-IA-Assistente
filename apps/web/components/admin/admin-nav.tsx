@@ -16,7 +16,7 @@ const ABAS = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Administração" className="flex gap-5 overflow-x-auto border-b px-4 sm:px-6">
+    <nav aria-label="Administração" className="flex snap-x gap-5 overflow-x-auto border-b px-4 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
       {ABAS.map((aba) => {
         const ativo = pathname.startsWith(aba.href);
         return (
@@ -24,7 +24,7 @@ export function AdminNav() {
             key={aba.href}
             href={aba.href}
             className={cn(
-              "border-b-2 py-3 text-sm font-medium transition-colors",
+              "shrink-0 snap-start border-b-2 py-3 text-sm font-medium transition-colors",
               ativo
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"

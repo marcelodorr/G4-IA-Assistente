@@ -65,10 +65,10 @@ export function NewChat({
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 px-4">
+    <div className="flex h-full min-h-0 flex-col items-center justify-start gap-5 overflow-y-auto px-2.5 py-5 sm:justify-center sm:gap-8 sm:px-4 sm:py-8">
       <div className="flex flex-col items-center gap-3 text-center">
         <Logo className="h-10 w-auto" />
-        <p className="text-lg text-muted-foreground">Transformando dados em experiências que realmente importam.</p>
+        <p className="text-sm text-muted-foreground sm:text-lg">Transformando dados em experiências que realmente importam.</p>
       </div>
       <div className="w-full max-w-xl space-y-3">
         {models.length === 0 && <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-center text-sm text-destructive">Nenhum modelo está liberado para seu usuário. Solicite acesso ao administrador.</p>}

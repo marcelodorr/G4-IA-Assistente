@@ -10,7 +10,7 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
   }, [error]);
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <main className="mx-auto max-w-5xl p-4 sm:p-6">
       <Card>
         <CardHeader><CardTitle>Não foi possível abrir esta página</CardTitle></CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">

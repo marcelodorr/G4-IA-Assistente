@@ -10,7 +10,7 @@ type MessagePart = UIMessage["parts"][number];
 function UserFilePart({ part }: { part: Extract<MessagePart, { type: "file" }> }) {
   if (part.mediaType.startsWith("image/")) {
     // eslint-disable-next-line @next/next/no-img-element -- URL pode ser data: URL ou arquivo local servido por /api/files
-    return <img src={part.url} alt={part.filename ?? "Anexo"} className="max-h-48 rounded-lg" />;
+    return <img src={part.url} alt={part.filename ?? "Anexo"} className="max-h-48 max-w-full rounded-lg object-contain" />;
   }
   return (
     <span className="flex items-center gap-1.5 rounded-full bg-secondary/80 px-3 py-1 text-xs">
@@ -23,11 +23,11 @@ function UserFilePart({ part }: { part: Extract<MessagePart, { type: "file" }> }
 function UserBubble({ message }: { message: UIMessage }) {
   return (
     <div className="flex justify-end">
-      <div className="flex max-w-[80%] flex-col items-end gap-2 rounded-2xl bg-secondary px-4 py-2">
+      <div className="flex max-w-[92%] min-w-0 flex-col items-end gap-2 overflow-hidden rounded-2xl bg-secondary px-3 py-2 sm:max-w-[80%] sm:px-4">
         {message.parts.map((part, i) => {
           if (part.type === "text") {
             return (
-              <p key={i} className="whitespace-pre-wrap text-sm">
+              <p key={i} className="max-w-full break-words whitespace-pre-wrap text-sm">
                 {part.text}
               </p>
             );
@@ -140,7 +140,7 @@ export function MessageList({ messages, streaming, interruptedMessageIds = [] }:
         message.role === "user" ? (
           <UserBubble key={message.id} message={message} />
         ) : (
-          <div key={message.id} className="w-full">
+          <div key={message.id} className="w-full min-w-0 overflow-hidden">
             <AssistantContent parts={message.parts} />
             {interrupted.has(message.id) && <div role="alert" className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">A resposta foi interrompida. Envie sua mensagem novamente para tentar de novo.</div>}
           </div>

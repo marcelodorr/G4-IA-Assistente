@@ -29,9 +29,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }),
   ]);
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh min-h-0 overflow-hidden">
       <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null }} conversations={convs} projects={projects} usage={usage} />
-      <main className="min-w-0 flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">{children}</main>
     </div>
   );
 }

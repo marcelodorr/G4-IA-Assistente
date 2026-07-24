@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminConfiguracoesPage() {
   const settings = await getSettings(db);
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
+    <main className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="font-heading text-xl font-medium">Configurações</h1>
         <p className="text-sm text-muted-foreground">Gerencie a chave, os modelos e os limites de consumo da IA.</p>

@@ -17,7 +17,7 @@ export default async function AdminAssistentePage({ params }: { params: Promise<
     .map(({ id, name, active }) => ({ id, name: active ? name : `${INTEGRATIONS[id].name} (inativa)` }));
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 p-6">
+    <main className="mx-auto max-w-2xl space-y-8 p-4 sm:p-6">
       <div>
         <h1 className="font-heading text-xl font-medium">{assistente.name}</h1>
         <p className="text-sm text-muted-foreground">Edite as configurações do assistente.</p>

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function SetupPage() {
   if (await isSetupCompleted(db)) redirect("/login");
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-dvh items-center justify-center p-4">
       <SetupWizard />
     </main>
   );

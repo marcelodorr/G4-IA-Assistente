@@ -157,7 +157,7 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
           <Label htmlFor="global-context">Contexto geral da aplicação</Label>
           <Textarea id="global-context" className="min-h-72" maxLength={50_000} value={content} onChange={(event) => setContent(event.target.value)} placeholder="Ex.: A Sequor atua... Sempre considere... Nunca..." />
           <label className="flex items-start gap-3 rounded-md border p-3"><input className="mt-1" type="checkbox" checked={autoLearn} onChange={(event) => setAutoLearn(event.target.checked)} /><span><span className="block font-medium">Aprendizado corporativo automático</span><span className="text-xs text-muted-foreground">Indexa documentos anexados e informações escritas pelos usuários, com origem auditável e gestão exclusiva do administrador.</span></span></label>
-          <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{content.length.toLocaleString("pt-BR")} / 50.000 caracteres</span><Button onClick={save} disabled={saving}>{saving ? "Salvando..." : "Salvar diretrizes"}</Button></div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><span className="text-xs text-muted-foreground">{content.length.toLocaleString("pt-BR")} / 50.000 caracteres</span><Button className="w-full sm:w-auto" onClick={save} disabled={saving}>{saving ? "Salvando..." : "Salvar diretrizes"}</Button></div>
         </CardContent>
       </Card>
 
