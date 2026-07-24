@@ -39,6 +39,7 @@ export function Chat({
     messages: initialMessages,
   });
   const enviouPendente = useRef(false);
+  const previousStatus = useRef(status);
 
   // primeira mensagem vinda da página "nova conversa"
   useEffect(() => {
@@ -55,6 +56,14 @@ export function Chat({
   useEffect(() => {
     if (status === "ready" && messages.length === 2) router.refresh();
   }, [status, messages.length, router]);
+
+  useEffect(() => {
+    const responseFinished = (previousStatus.current === "streaming" || previousStatus.current === "submitted") && (status === "ready" || status === "error");
+    previousStatus.current = status;
+    if (!responseFinished) return;
+    const timer = window.setTimeout(() => window.dispatchEvent(new Event("sequor:usage-updated")), 500);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   useEffect(() => {
     if (error) {

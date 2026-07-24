@@ -157,6 +157,105 @@ export async function recordCompletedChatUsage(db: Db, input: {
   });
 }
 
+function quotaPeriod(used: number, limit: number, resetAt: Date, customized: boolean) {
+  const safeLimit = Math.max(0, limit);
+  return {
+    used,
+    limit: safeLimit,
+    remaining: Math.max(0, safeLimit - used),
+    percentage: safeLimit === 0 ? 100 : Math.min(100, Math.round((used / safeLimit) * 100)),
+    resetAt: resetAt.toISOString(),
+    customized,
+  };
+}
+
+export async function getUserUsageSummary(db: Db, userId: string) {
+  const now = new Date();
+  const { day, week, month } = periodStarts(now);
+  const nextDay = new Date(day);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const nextWeek = new Date(week);
+  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+  const nextMonth = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1));
+
+  const [configRows, userRows, totals, activity] = await Promise.all([
+    db.select({
+      daily: settings.dailyTokenLimit,
+      weekly: settings.weeklyTokenLimit,
+      monthly: settings.monthlyTokenLimit,
+    }).from(settings).where(eq(settings.id, 1)),
+    db.select({
+      daily: users.dailyTokenLimit,
+      weekly: users.weeklyTokenLimit,
+      monthly: users.monthlyTokenLimit,
+    }).from(users).where(eq(users.id, userId)),
+    db.execute(sql`
+      select
+        coalesce(sum(greatest(input_tokens + output_tokens, reserved_tokens)) filter (where created_at >= ${day}), 0)::bigint as "dailyUsed",
+        coalesce(sum(greatest(input_tokens + output_tokens, reserved_tokens)) filter (where created_at >= ${week}), 0)::bigint as "weeklyUsed",
+        coalesce(sum(greatest(input_tokens + output_tokens, reserved_tokens)) filter (where created_at >= ${month}), 0)::bigint as "monthlyUsed"
+      from ai_usage
+      where user_id = ${userId}
+        and created_at >= ${week.getTime() < month.getTime() ? week : month}
+    `),
+    db.execute(sql`
+      select a.id, a.kind, a.model, a.input_tokens as "inputTokens",
+        a.output_tokens as "outputTokens", a.reserved_tokens as "reservedTokens",
+        a.duration_ms as "durationMs", a.success, a.created_at as "createdAt",
+        a.finished_at as "finishedAt", a.conversation_id as "conversationId",
+        coalesce(c.title, 'Nova conversa') as "conversationTitle"
+      from ai_usage a
+      left join conversations c on c.id = a.conversation_id
+      where a.user_id = ${userId}
+      order by a.created_at desc
+      limit 30
+    `),
+  ]);
+
+  const numberValue = (value: unknown) => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const config = configRows[0];
+  const user = userRows[0];
+  if (!user) throw new Error("Usuário não encontrado");
+  const dailyLimit = user.daily ?? config?.daily ?? 200_000;
+  const weeklyLimit = user.weekly ?? config?.weekly ?? 1_000_000;
+  const monthlyLimit = user.monthly ?? config?.monthly ?? 4_000_000;
+  const totalRow = (totals[0] ?? {}) as Record<string, unknown>;
+
+  return {
+    updatedAt: now.toISOString(),
+    periods: {
+      daily: quotaPeriod(numberValue(totalRow.dailyUsed), dailyLimit, nextDay, user.daily != null),
+      weekly: quotaPeriod(numberValue(totalRow.weeklyUsed), weeklyLimit, nextWeek, user.weekly != null),
+      monthly: quotaPeriod(numberValue(totalRow.monthlyUsed), monthlyLimit, nextMonth, user.monthly != null),
+    },
+    interactions: [...activity].map((value) => {
+      const row = value as Record<string, unknown>;
+      const inputTokens = numberValue(row.inputTokens);
+      const outputTokens = numberValue(row.outputTokens);
+      const reservedTokens = numberValue(row.reservedTokens);
+      const processing = row.finishedAt == null;
+      return {
+        id: String(row.id),
+        kind: String(row.kind) as "chat" | "embedding" | "image" | "artifact",
+        model: String(row.model),
+        conversationId: row.conversationId == null ? null : String(row.conversationId),
+        conversationTitle: String(row.conversationTitle ?? "Nova conversa"),
+        inputTokens,
+        outputTokens,
+        tokens: Math.max(inputTokens + outputTokens, reservedTokens),
+        processing,
+        success: row.success == null ? null : Boolean(row.success),
+        durationMs: row.durationMs == null ? null : numberValue(row.durationMs),
+        createdAt: new Date(String(row.createdAt)).toISOString(),
+        finishedAt: row.finishedAt == null ? null : new Date(String(row.finishedAt)).toISOString(),
+      };
+    }),
+  };
+}
+
 export async function getUsageDashboard(db: Db) {
   const { day, week, month } = periodStarts();
   const userUsageSince = week.getTime() < month.getTime() ? week : month;

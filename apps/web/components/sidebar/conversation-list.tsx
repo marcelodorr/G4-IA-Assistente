@@ -11,18 +11,25 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { listConversations } from "@/lib/services/conversations";
 import type { listProjects } from "@/lib/services/projects";
+import type { getUserUsageSummary } from "@/lib/services/usage";
+import { UserUsageWidget } from "@/components/usage/user-usage-widget";
 
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
+type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
 
 export function ConversationList({
   conversations,
   projects,
   user,
+  usage,
+  liveUsage,
 }: {
   conversations: ConversationRow[];
   projects: ProjectRow[];
   user: Session["user"];
+  usage: Usage;
+  liveUsage: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -86,6 +93,7 @@ export function ConversationList({
         )}
       </nav>
       <div className="space-y-2 border-t p-3">
+        <UserUsageWidget initialUsage={usage} live={liveUsage} />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <Link href="/integracoes" className="mr-3 text-xs text-muted-foreground hover:text-foreground">Integrações</Link>
