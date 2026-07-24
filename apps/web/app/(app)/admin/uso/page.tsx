@@ -2,16 +2,17 @@ import { db } from "@/lib/db";
 import { getSettings } from "@/lib/services/settings";
 import { getUsageDashboard } from "@/lib/services/usage";
 import { UsageQuotaTable } from "@/components/admin/usage-quota-table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TriangleAlert } from "lucide-react";
+import { RefreshButton } from "@/components/admin/refresh-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsagePage() {
   let data: Awaited<ReturnType<typeof getUsageDashboard>>;
-  let settings: Awaited<ReturnType<typeof getSettings>>;
   try {
-    [data, settings] = await Promise.all([getUsageDashboard(db), getSettings(db)]);
+    data = await getUsageDashboard(db);
   } catch (error) {
     console.error("[admin/uso] Falha ao carregar o painel de uso", error);
     return (
@@ -27,11 +28,16 @@ export default async function UsagePage() {
       </main>
     );
   }
+  const settings = await getSettings(db).catch((error) => {
+    console.error("[admin/uso] Falha ao carregar limites globais", error);
+    return { dailyTokenLimit: 200_000, weeklyTokenLimit: 1_000_000, monthlyTokenLimit: 4_000_000 };
+  });
   const usage = data;
   const totalTokens = Number(usage.totals.inputTokens) + Number(usage.totals.outputTokens);
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-      <div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="font-heading text-xl font-medium">Uso de IA</h1><p className="text-sm text-muted-foreground">Consumo do mês atual, custos estimados e cotas por usuário.</p></div><RefreshButton label="Atualizar métricas" /></div>
+      {usage.unavailable.length > 0 && <Card className="border-amber-500/40 bg-amber-500/5"><CardHeader><div className="flex items-start gap-2"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-400" /><div><CardTitle className="text-sm">Algumas métricas estão temporariamente indisponíveis</CardTitle><CardDescription>Falhou: {usage.unavailable.join(", ")}. Consulte Saúde para verificar a estrutura do banco; as demais áreas continuam funcionando.</CardDescription></div></div></CardHeader></Card>}
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-sm">Tokens</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{totalTokens.toLocaleString("pt-BR")}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Chamadas</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{Number(usage.totals.calls).toLocaleString("pt-BR")}</CardContent></Card>
@@ -39,7 +45,7 @@ export default async function UsagePage() {
         <Card><CardHeader><CardTitle className="text-sm">Custo estimado</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">US$ {(Number(usage.totals.costMicros) / 1_000_000).toFixed(4)}</CardContent></Card>
       </div>
       <Card><CardHeader><CardTitle>Consumo e cotas por usuário</CardTitle></CardHeader><CardContent className="overflow-x-auto"><UsageQuotaTable rows={usage.byUser} globalDaily={settings.dailyTokenLimit} globalWeekly={settings.weeklyTokenLimit} globalMonthly={settings.monthlyTokenLimit} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>Conversas com maior consumo</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Conversa</TableHead><TableHead>Usuário</TableHead><TableHead>Tokens</TableHead><TableHead>Custo estimado</TableHead></TableRow></TableHeader><TableBody>{usage.byConversation.map((row) => <TableRow key={row.id}><TableCell>{row.title}</TableCell><TableCell>{row.userName}</TableCell><TableCell>{Number(row.tokens).toLocaleString("pt-BR")}</TableCell><TableCell>US$ {(Number(row.costMicros) / 1_000_000).toFixed(4)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+      <Card><CardHeader><CardTitle>Conversas com maior consumo</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Conversa</TableHead><TableHead>Usuário</TableHead><TableHead>Tokens</TableHead><TableHead>Custo estimado</TableHead></TableRow></TableHeader><TableBody>{usage.byConversation.map((row) => <TableRow key={row.id}><TableCell>{row.title}</TableCell><TableCell>{row.userName}</TableCell><TableCell>{Number(row.tokens).toLocaleString("pt-BR")}</TableCell><TableCell>US$ {(Number(row.costMicros) / 1_000_000).toFixed(4)}</TableCell></TableRow>)}{usage.byConversation.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">Ainda não há consumo vinculado a conversas neste mês.</TableCell></TableRow>}</TableBody></Table></CardContent></Card>
       <p className="text-xs text-muted-foreground">Custos são estimativas baseadas na tabela pública de preços configurada no código; cache, lotes e alterações de preço podem mudar o valor real.</p>
     </main>
   );

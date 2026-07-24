@@ -1,11 +1,12 @@
 import { mkdir, statfs } from "fs/promises";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { assistantFiles, aiUsage, corporateMemories, globalContextFiles } from "@/lib/db/schema";
+import { artifactJobs, assistantFiles, aiUsage, corporateMemories, globalContextFiles, projectFiles } from "@/lib/db/schema";
 import { uploadsDir } from "@/lib/files/storage";
 import { getOpenAIKey, getSettings } from "@/lib/services/settings";
 
 type Check = { status: "ok" | "warning" | "error"; message: string; durationMs?: number };
+type SchemaCheck = Check & { missing: string[] };
 
 async function databaseCheck(): Promise<Check> {
   const started = Date.now();
@@ -14,6 +15,45 @@ async function databaseCheck(): Promise<Check> {
     return { status: "ok", message: "Conectado", durationMs: Date.now() - started };
   } catch {
     return { status: "error", message: "Sem conexão", durationMs: Date.now() - started };
+  }
+}
+
+async function schemaCheck(): Promise<SchemaCheck> {
+  const started = Date.now();
+  try {
+    const rows = await db.execute(sql`
+      select
+        to_regclass('public.ai_usage') is not null as "aiUsage",
+        to_regclass('public.project_files') is not null as "projectFiles",
+        to_regclass('public.artifact_jobs') is not null as "artifactJobs",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'daily_token_limit') as "settingsDaily",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'weekly_token_limit') as "settingsWeekly",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'monthly_token_limit') as "settingsMonthly",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'daily_token_limit') as "usersDaily",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'weekly_token_limit') as "usersWeekly",
+        exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'monthly_token_limit') as "usersMonthly"
+    `);
+    const row = (rows[0] ?? {}) as Record<string, unknown>;
+    const required: Array<[string, string]> = [
+      ["aiUsage", "tabela ai_usage"],
+      ["projectFiles", "tabela project_files"],
+      ["artifactJobs", "tabela artifact_jobs"],
+      ["settingsDaily", "settings.daily_token_limit"],
+      ["settingsWeekly", "settings.weekly_token_limit"],
+      ["settingsMonthly", "settings.monthly_token_limit"],
+      ["usersDaily", "users.daily_token_limit"],
+      ["usersWeekly", "users.weekly_token_limit"],
+      ["usersMonthly", "users.monthly_token_limit"],
+    ];
+    const missing = required.filter(([key]) => row[key] !== true).map(([, label]) => label);
+    return {
+      status: missing.length > 0 ? "error" : "ok",
+      message: missing.length > 0 ? `${missing.length} item(ns) pendente(s) de migration` : "Estrutura atualizada",
+      durationMs: Date.now() - started,
+      missing,
+    };
+  } catch {
+    return { status: "error", message: "Não foi possível validar as migrations", durationMs: Date.now() - started, missing: [] };
   }
 }
 
@@ -78,42 +118,48 @@ async function updateCheck(): Promise<Check & { currentVersion: string; latestVe
 export async function getAdminHealth() {
   const since = new Date(Date.now() - 24 * 60 * 60_000);
   const checks = await Promise.all([databaseCheck(), openAiCheck(), storageCheck(), updateCheck()]);
-  let database = checks[0];
+  const database = checks[0];
   const [, openai, storage, update] = checks;
+  const schema = database.status === "ok"
+    ? await schemaCheck()
+    : { status: "error" as const, message: "Aguardando conexão com o banco", missing: [] };
   let jobs: Array<{ status: string; total: number }> = [];
   let usage: Array<{ calls: number; failures: number; tokens: number }> = [];
   let configured = { hasOpenAiKey: false, defaultModel: "desconhecido" };
+  const unavailable: string[] = [];
   if (database.status === "ok") {
-    try {
-      const [assistantJobs, globalJobs, memoryJobs, usageRows, configuredSettings] = await Promise.all([
-        db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status),
-        db.select({ status: globalContextFiles.status, total: sql<number>`count(*)::int` }).from(globalContextFiles).groupBy(globalContextFiles.status),
-        db.select({ status: corporateMemories.status, total: sql<number>`count(*)::int` }).from(corporateMemories).groupBy(corporateMemories.status),
-        db.select({
-          calls: sql<number>`count(*)::int`,
-          failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
-          tokens: sql<number>`coalesce(sum(${aiUsage.inputTokens} + ${aiUsage.outputTokens}), 0)::bigint`,
-        }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`),
-        getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })),
-      ]);
-      jobs = [...assistantJobs, ...globalJobs, ...memoryJobs];
-      usage = usageRows;
-      configured = configuredSettings;
-    } catch (error) {
-      console.error("[admin/saude] Falha ao consultar métricas do banco", error);
-      database = {
-        ...database,
-        status: "warning",
-        message: "Conectado, mas as métricas falharam. Verifique as migrations.",
-      };
-    }
+    const safeMetric = async <T>(label: string, query: () => Promise<T>, fallback: T) => {
+      try {
+        return await query();
+      } catch (error) {
+        console.error(`[admin/saude] Falha ao consultar ${label}`, error);
+        unavailable.push(label);
+        return fallback;
+      }
+    };
+    const [assistantJobs, globalJobs, projectJobs, memoryJobs, artifactJobRows, usageRows, configuredSettings] = await Promise.all([
+      safeMetric("arquivos de assistentes", () => db.select({ status: assistantFiles.status, total: sql<number>`count(*)::int` }).from(assistantFiles).groupBy(assistantFiles.status), []),
+      safeMetric("arquivos do contexto geral", () => db.select({ status: globalContextFiles.status, total: sql<number>`count(*)::int` }).from(globalContextFiles).groupBy(globalContextFiles.status), []),
+      safeMetric("arquivos de projetos", () => db.select({ status: projectFiles.status, total: sql<number>`count(*)::int` }).from(projectFiles).groupBy(projectFiles.status), []),
+      safeMetric("memórias corporativas", () => db.select({ status: corporateMemories.status, total: sql<number>`count(*)::int` }).from(corporateMemories).groupBy(corporateMemories.status), []),
+      safeMetric("geração de imagens", () => db.select({ status: artifactJobs.status, total: sql<number>`count(*)::int` }).from(artifactJobs).groupBy(artifactJobs.status), []),
+      safeMetric("uso das últimas 24 horas", () => db.select({
+        calls: sql<number>`count(*)::int`,
+        failures: sql<number>`count(*) filter (where ${aiUsage.success} = false)::int`,
+        tokens: sql<number>`coalesce(sum(greatest(${aiUsage.inputTokens} + ${aiUsage.outputTokens}, ${aiUsage.reservedTokens})), 0)::bigint`,
+      }).from(aiUsage).where(sql`${aiUsage.createdAt} >= ${since}`), []),
+      safeMetric("configurações de IA", () => getSettings(db).then((value) => ({ hasOpenAiKey: value.hasKey, defaultModel: value.defaultModel })), configured),
+    ]);
+    jobs = [...assistantJobs, ...globalJobs, ...projectJobs, ...memoryJobs, ...artifactJobRows];
+    usage = usageRows;
+    configured = configuredSettings;
   }
   const jobCounts = jobs.reduce<Record<string, number>>((counts, row) => {
     counts[row.status] = (counts[row.status] ?? 0) + Number(row.total);
     return counts;
   }, {});
   return {
-    checkedAt: new Date(), database, openai, storage, update,
+    checkedAt: new Date(), database, schema, openai, storage, update, unavailable,
     jobs: { pending: (jobCounts.pending ?? 0) + (jobCounts.processing ?? 0), errors: jobCounts.error ?? 0 },
     usage: { calls: Number(usage[0]?.calls ?? 0), failures: Number(usage[0]?.failures ?? 0), tokens: Number(usage[0]?.tokens ?? 0) },
     configured,

@@ -275,33 +275,56 @@ export async function getUserUsageSummary(db: Db, userId: string) {
 export async function getUsageDashboard(db: Db) {
   const { day, week, month } = periodStarts();
   const userUsageSince = week.getTime() < month.getTime() ? week : month;
-  const totals = await db.execute(sql`
-    select
-      coalesce(sum(input_tokens), 0)::int as "inputTokens",
-      coalesce(sum(output_tokens), 0)::int as "outputTokens",
-      coalesce(sum(estimated_cost_micros), 0)::bigint as "costMicros",
-      count(*)::int as calls,
-      count(*) filter (where success = false)::int as failures
-    from ai_usage where created_at >= ${month}
-  `);
-  const byUser = await db.execute(sql`
-    select u.id, u.name, u.email,
-      coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${day}), 0)::int as "todayTokens",
-      coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${week}), 0)::int as "weekTokens",
-      coalesce(sum(a.input_tokens + a.output_tokens) filter (where a.created_at >= ${month}), 0)::int as "monthTokens",
-      coalesce(sum(a.estimated_cost_micros) filter (where a.created_at >= ${month}), 0)::bigint as "costMicros",
-      u.daily_token_limit as "dailyTokenLimit", u.weekly_token_limit as "weeklyTokenLimit", u.monthly_token_limit as "monthlyTokenLimit"
-    from users u left join ai_usage a on a.user_id = u.id and a.created_at >= ${userUsageSince}
-    group by u.id order by "monthTokens" desc
-  `);
-  const byConversation = await db.execute(sql`
-    select c.id, coalesce(c.title, 'Nova conversa') as title, u.name as "userName",
-      coalesce(sum(a.input_tokens + a.output_tokens), 0)::int as tokens,
-      coalesce(sum(a.estimated_cost_micros), 0)::bigint as "costMicros"
-    from ai_usage a join conversations c on c.id = a.conversation_id join users u on u.id = a.user_id
-    where a.created_at >= ${month}
-    group by c.id, u.name order by tokens desc limit 20
-  `);
+  const unavailable: string[] = [];
+  const safeQuery = async <T>(label: string, query: () => Promise<T>, fallback: T) => {
+    try {
+      return await query();
+    } catch (error) {
+      console.error(`[admin/uso] Falha ao consultar ${label}`, error);
+      unavailable.push(label);
+      return fallback;
+    }
+  };
+
+  const [totals, byUserResult, byConversation] = await Promise.all([
+    safeQuery("resumo mensal", async () => [...await db.execute(sql`
+      select
+        coalesce(sum(input_tokens), 0)::bigint as "inputTokens",
+        coalesce(sum(output_tokens), 0)::bigint as "outputTokens",
+        coalesce(sum(estimated_cost_micros), 0)::bigint as "costMicros",
+        count(*)::int as calls,
+        count(*) filter (where success = false)::int as failures
+      from ai_usage where created_at >= ${month}
+    `)], []),
+    safeQuery("consumo por usuário", async () => [...await db.execute(sql`
+      select u.id, u.name, u.email,
+        coalesce(sum(greatest(a.input_tokens + a.output_tokens, a.reserved_tokens)) filter (where a.created_at >= ${day}), 0)::bigint as "todayTokens",
+        coalesce(sum(greatest(a.input_tokens + a.output_tokens, a.reserved_tokens)) filter (where a.created_at >= ${week}), 0)::bigint as "weekTokens",
+        coalesce(sum(greatest(a.input_tokens + a.output_tokens, a.reserved_tokens)) filter (where a.created_at >= ${month}), 0)::bigint as "monthTokens",
+        coalesce(sum(a.estimated_cost_micros) filter (where a.created_at >= ${month}), 0)::bigint as "costMicros",
+        u.daily_token_limit as "dailyTokenLimit", u.weekly_token_limit as "weeklyTokenLimit", u.monthly_token_limit as "monthlyTokenLimit"
+      from users u left join ai_usage a on a.user_id = u.id and a.created_at >= ${userUsageSince}
+      group by u.id order by "monthTokens" desc
+    `)], null),
+    safeQuery("consumo por conversa", async () => [...await db.execute(sql`
+      select c.id, coalesce(c.title, 'Nova conversa') as title, u.name as "userName",
+        coalesce(sum(greatest(a.input_tokens + a.output_tokens, a.reserved_tokens)), 0)::bigint as tokens,
+        coalesce(sum(a.estimated_cost_micros), 0)::bigint as "costMicros"
+      from ai_usage a join conversations c on c.id = a.conversation_id join users u on u.id = a.user_id
+      where a.created_at >= ${month}
+      group by c.id, u.name order by tokens desc limit 20
+    `)], []),
+  ]);
+
+  // Mesmo que a tabela de uso esteja temporariamente indisponível, mantém a
+  // administração de usuários acessível com valores zerados. Isso também dá
+  // ao painel de Saúde uma chance de apontar exatamente a migration ausente.
+  const byUser = byUserResult ?? await safeQuery("lista básica de usuários", async () => [...await db.execute(sql`
+    select id, name, email,
+      0::bigint as "todayTokens", 0::bigint as "weekTokens", 0::bigint as "monthTokens", 0::bigint as "costMicros",
+      null::integer as "dailyTokenLimit", null::integer as "weeklyTokenLimit", null::integer as "monthlyTokenLimit"
+    from users order by name
+  `)], []);
   // postgres-js pode devolver colunas bigint como string ou bigint. Converta
   // tudo antes de atravessar a fronteira Server Component -> Client Component.
   // Um bigint em `byUser`, por exemplo, derruba a página inteira durante a
@@ -314,6 +337,7 @@ export async function getUsageDashboard(db: Db) {
   const totalRow = (totals[0] ?? {}) as Record<string, unknown>;
 
   return {
+    unavailable,
     totals: {
       inputTokens: numberValue(totalRow.inputTokens),
       outputTokens: numberValue(totalRow.outputTokens),
