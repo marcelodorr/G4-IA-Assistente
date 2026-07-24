@@ -37,8 +37,9 @@ export function MessageInput({
   const [mostrarLink, setMostrarLink] = useState(false);
   const [enviandoLink, setEnviandoLink] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [controls, setControls] = useState<ChatControls>({ selectedIntegrationIds: [], selectedSkillIds: [] });
+  const [controls, setControls] = useState<ChatControls>({ generationMode: "chat", selectedIntegrationIds: [], selectedSkillIds: [] });
   const effectiveControls: ChatControls = {
+    generationMode: controls.generationMode,
     selectedIntegrationIds: controls.selectedIntegrationIds.filter((id) => integrations.some((item) => item.id === id)),
     selectedSkillIds: controls.selectedSkillIds.filter((id) => skills.some((item) => item.id === id)),
   };
@@ -100,6 +101,11 @@ export function MessageInput({
   return (
     <div className="border-t px-2.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:p-4">
       <ChatCapabilitySelectors integrations={integrations} skills={skills} controls={effectiveControls} onChange={setControls} defaultIntegrationId={defaultIntegrationId} />
+      {effectiveControls.generationMode === "image" && (
+        <div className="mb-2 rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-2 text-xs text-foreground">
+          <span className="font-medium text-fuchsia-500">Modo imagem ativo.</span> Descreva o que deseja e a imagem será gerada diretamente. Se faltar algum detalhe, a IA adotará uma opção adequada sem interromper para perguntar.
+        </div>
+      )}
       {suggestions.length > 0 && !text && (
         <div className="mb-3 space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">Experimente perguntar:</p>
@@ -141,7 +147,7 @@ export function MessageInput({
               submit();
             }
           }}
-          placeholder="Envie uma mensagem..."
+          placeholder={effectiveControls.generationMode === "image" ? "Descreva a imagem que deseja criar..." : "Envie uma mensagem..."}
           rows={1}
           maxLength={CHAT_LIMITS.maxMessageChars}
           className="max-h-40 min-h-[44px] resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
@@ -150,7 +156,7 @@ export function MessageInput({
           <Button className="size-10 sm:size-8" variant="ghost" size="icon" onClick={() => inputRef.current?.click()} disabled={enviandoArquivo} aria-label="Anexar arquivo"><Paperclip /></Button>
           <Button className="size-10 sm:size-8" variant={mostrarLink ? "secondary" : "ghost"} size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
           <div className="flex-1" />
-          <Button className="h-10 px-3 sm:h-8" onClick={submit} disabled={disabled} aria-label="Enviar mensagem"><SendHorizontal /><span className="hidden sm:inline">Enviar</span></Button>
+          <Button className="h-10 px-3 sm:h-8" onClick={submit} disabled={disabled} aria-label={effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar mensagem"}><SendHorizontal /><span className="hidden sm:inline">{effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar"}</span></Button>
         </div>
       </div>
       <p className="mt-2 hidden text-center text-xs text-muted-foreground sm:block">

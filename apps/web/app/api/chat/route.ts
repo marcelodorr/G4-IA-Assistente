@@ -40,7 +40,7 @@ import { listUserIntegrations } from "@/lib/services/integrations";
 
 export const maxDuration = 150;
 
-type ChatRequestBody = { message?: unknown; conversationId?: unknown; selectedIntegrationIds?: unknown; selectedSkillIds?: unknown };
+type ChatRequestBody = { message?: unknown; conversationId?: unknown; generationMode?: unknown; selectedIntegrationIds?: unknown; selectedSkillIds?: unknown };
 
 function toUiMessages(rows: Awaited<ReturnType<typeof getCompletedMessages>>): UIMessage[] {
   return rows.map((message) => ({
@@ -89,7 +89,8 @@ export const POST = apiHandler(async (req) => {
   }
   const modelPolicy = getModelPolicy(modelId)!;
   const temBase = await hasReadyKnowledge(db, assistant?.id ?? null, project?.id ?? null);
-  const agentType = assistant?.agentType ?? "chat";
+  const imageMode = selections.generationMode === "image";
+  const agentType = imageMode ? "image" : (assistant?.agentType ?? "chat");
   const integrationPrompt = assistant?.integrationProvider
     ? `INTEGRAÇÃO PADRÃO DESTE ASSISTENTE: ${INTEGRATIONS[assistant.integrationProvider].name}. Quando a solicitação depender de dados dessa plataforma, use a ferramenta disponível automaticamente. Se a conta do usuário ainda não estiver conectada, explique como conectá-la em Minhas integrações; nunca invente dados.`
     : null;
@@ -99,7 +100,10 @@ export const POST = apiHandler(async (req) => {
   const selectedSkillPrompt = selections.selectedSkillIds.length
     ? "O usuário acionou explicitamente as SKILLS identificadas no contexto do projeto. Siga essas skills nesta resposta, subordinadas às regras de segurança e da empresa."
     : null;
-  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt, selectedIntegrationPrompt, selectedSkillPrompt].filter(Boolean).join("\n\n");
+  const forcedImagePrompt = imageMode
+    ? "MODO CRIAR IMAGEM SELECIONADO EXPLICITAMENTE. Você DEVE chamar gerarImagem exatamente uma vez nesta resposta. Não responda apenas com texto e não faça perguntas adicionais quando existir uma descrição utilizável. Complete detalhes ausentes com premissas profissionais coerentes. Preserve textos, marca, proporção e finalidade pedidos pelo usuário. Depois de acionar a ferramenta, apenas informe de forma breve que a imagem está sendo gerada."
+    : null;
+  const assistantPrompt = [assistant?.systemPrompt, AGENT_TYPE_INSTRUCTIONS[agentType], integrationPrompt, selectedIntegrationPrompt, selectedSkillPrompt, forcedImagePrompt].filter(Boolean).join("\n\n");
   const systemPrompt = composeSystemPrompt({
     globalContext,
     userContext: buildPersonalContext(ownProfile),
@@ -218,7 +222,12 @@ export const POST = apiHandler(async (req) => {
     const webTools: ToolSet = ownProfile.preferences.webSearchEnabled ? {
       web_search: openai.tools.webSearch({ searchContextSize: "medium", externalWebAccess: true }),
     } : {};
-    const tools: ToolSet | undefined = modelPolicy.supportsTools ? { ...knowledgeTools, ...agentTools, ...integrationTools, ...webTools } : undefined;
+    if (imageMode && !modelPolicy.supportsTools) {
+      throw new Error("O modelo desta conversa não permite gerar imagens. Selecione outro modelo e tente novamente.");
+    }
+    const tools: ToolSet | undefined = modelPolicy.supportsTools
+      ? imageMode ? agentTools : { ...knowledgeTools, ...agentTools, ...integrationTools, ...webTools }
+      : undefined;
     let failurePersistence: Promise<void> | null = null;
     const markInterrupted = (reason: string) => {
       failurePersistence ??= (async () => {
@@ -237,6 +246,10 @@ export const POST = apiHandler(async (req) => {
       maxOutputTokens,
       stopWhen: stepCountIs(CHAT_LIMITS.maxToolCalls + 1),
       tools,
+      prepareStep: imageMode ? ({ stepNumber }) => ({
+        activeTools: ["gerarImagem"],
+        toolChoice: stepNumber === 0 ? { type: "tool" as const, toolName: "gerarImagem" } : "none" as const,
+      }) : undefined,
       timeout: { totalMs: CHAT_LIMITS.totalTimeoutMs, toolMs: 120_000 },
       onError: ({ error }) => {
         void logSystemError(db, { error, userId: session.user.id, source: "Resposta da IA", path: `/c/${body.conversationId}` });
