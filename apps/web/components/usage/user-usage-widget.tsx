@@ -53,6 +53,7 @@ export function UserUsageWidget({ initialUsage, live = true }: { initialUsage: U
           {latest.processing ? "Em andamento: até " : "Última operação: "}{formatTokens(latest.tokens)} tokens
         </p>
       )}
+      {usage && usage.unavailable.length > 0 && <p className="mt-1 text-[11px] text-amber-500">Alguns dados estão temporariamente indisponíveis</p>}
     </Link>
   );
 }

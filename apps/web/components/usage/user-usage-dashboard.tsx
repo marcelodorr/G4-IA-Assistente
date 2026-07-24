@@ -56,6 +56,7 @@ export function UserUsageDashboard({ initialUsage }: { initialUsage: Usage }) {
 
   return (
     <div className="space-y-6">
+      {usage.unavailable.length > 0 && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">Dados parciais: não foi possível consultar {usage.unavailable.join(", ")}. As demais informações continuam atualizando normalmente.</div>}
       <div className="grid gap-4 md:grid-cols-3">
         {(Object.keys(periodLabels) as Array<keyof typeof periodLabels>).map((key) => <QuotaCard key={key} label={periodLabels[key]} period={usage.periods[key]} />)}
       </div>
