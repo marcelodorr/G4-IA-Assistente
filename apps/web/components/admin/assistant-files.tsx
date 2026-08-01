@@ -101,28 +101,37 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
     return () => clearInterval(intervalo);
   }, [files, carregar]);
 
-  async function enviarArquivo(arquivo: File) {
-    if (arquivo.size > MAX_UPLOAD_BYTES) {
-      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
-      return;
-    }
+  async function enviarArquivos(arquivos: File[]) {
+    const arquivosValidos = arquivos.filter((arquivo) => arquivo.size <= MAX_UPLOAD_BYTES);
+    const excedentes = arquivos.length - arquivosValidos.length;
+    if (excedentes > 0) toast.error(`${excedentes === 1 ? "Um arquivo excede" : `${excedentes} arquivos excedem`} o limite de ${MAX_UPLOAD_LABEL} por arquivo`);
+    if (arquivosValidos.length === 0) return;
+
     setEnviando(true);
-    const form = new FormData();
-    form.append("file", arquivo);
-    const res = await fetch(`/api/assistants/${assistantId}/files`, { method: "POST", body: form });
-    setEnviando(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      toast.error(data.error ?? "Erro ao enviar arquivo");
-      return;
+    try {
+      const resultados = await Promise.allSettled(arquivosValidos.map(async (arquivo) => {
+        const form = new FormData();
+        form.append("file", arquivo);
+        const res = await fetch(`/api/assistants/${assistantId}/files`, { method: "POST", body: form });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `Erro ao enviar ${arquivo.name}`);
+        }
+      }));
+      const enviados = resultados.filter((resultado) => resultado.status === "fulfilled").length;
+      const falhas = resultados.length - enviados;
+      if (enviados > 0) toast.success(`${enviados} ${enviados === 1 ? "arquivo enviado" : "arquivos enviados"} para processamento`);
+      if (falhas > 0) toast.error(`${falhas} ${falhas === 1 ? "arquivo não pôde" : "arquivos não puderam"} ser enviado${falhas === 1 ? "" : "s"}`);
+      await carregar();
+    } finally {
+      setEnviando(false);
     }
-    await carregar();
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const arquivo = e.target.files?.[0];
+    const arquivos = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (arquivo) enviarArquivo(arquivo);
+    if (arquivos.length > 0) void enviarArquivos(arquivos);
   }
 
   async function adicionarSite() {
@@ -166,6 +175,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
           <input
             ref={inputRef}
             type="file"
+            multiple
             accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml"
             className="hidden"
             onChange={onFileChange}
@@ -176,7 +186,7 @@ export function AssistantFiles({ assistantId }: { assistantId: string }) {
             disabled={enviando}
             onClick={() => inputRef.current?.click()}
           >
-            {enviando ? "Enviando..." : "Adicionar arquivo"}
+            {enviando ? "Enviando arquivos..." : "Adicionar arquivos"}
           </Button>
         </div>
       </div>

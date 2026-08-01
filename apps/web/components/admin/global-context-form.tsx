@@ -115,19 +115,31 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
     await Promise.all([loadFiles(), loadMemories()]);
   }
 
-  async function upload(file: File) {
-    if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
-      return;
-    }
+  async function upload(selectedFiles: File[]) {
+    const validFiles = selectedFiles.filter((file) => file.size <= MAX_UPLOAD_BYTES);
+    const oversizedCount = selectedFiles.length - validFiles.length;
+    if (oversizedCount > 0) toast.error(`${oversizedCount === 1 ? "Um arquivo excede" : `${oversizedCount} arquivos excedem`} o limite de ${MAX_UPLOAD_LABEL} por arquivo`);
+    if (validFiles.length === 0) return;
+
     setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-    const response = await fetch("/api/context/files", { method: "POST", body: form });
-    setUploading(false);
-    if (!response.ok) return toast.error((await response.json()).error ?? "Erro ao enviar arquivo");
-    toast.success("Arquivo enviado para processamento");
-    await loadFiles();
+    try {
+      const results = await Promise.allSettled(validFiles.map(async (file) => {
+        const form = new FormData();
+        form.append("file", file);
+        const response = await fetch("/api/context/files", { method: "POST", body: form });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error ?? `Erro ao enviar ${file.name}`);
+        }
+      }));
+      const uploadedCount = results.filter((result) => result.status === "fulfilled").length;
+      const failedCount = results.length - uploadedCount;
+      if (uploadedCount > 0) toast.success(`${uploadedCount} ${uploadedCount === 1 ? "arquivo enviado" : "arquivos enviados"} para processamento`);
+      if (failedCount > 0) toast.error(`${failedCount} ${failedCount === 1 ? "arquivo não pôde" : "arquivos não puderam"} ser enviado${failedCount === 1 ? "" : "s"}`);
+      await loadFiles();
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function addSite() {
@@ -166,8 +178,8 @@ export function GlobalContextForm({ initialContent, initialFiles, initialMemorie
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">Aceita Markdown, JPG/JPEG, PNG, SVG, Excel, Word, PowerPoint e HTML, até {MAX_UPLOAD_LABEL}.</p>
-            <input ref={inputRef} className="hidden" type="file" accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(file); }} />
-            <Button variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? "Enviando..." : "Adicionar arquivo"}</Button>
+            <input ref={inputRef} className="hidden" type="file" multiple accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml" onChange={(event) => { const selectedFiles = Array.from(event.target.files ?? []); event.target.value = ""; if (selectedFiles.length > 0) void upload(selectedFiles); }} />
+            <Button variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? "Enviando arquivos..." : "Adicionar arquivos"}</Button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input type="url" value={siteUrl} onChange={(event) => setSiteUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addSite(); } }} placeholder="https://www.exemplo.com.br/pagina" aria-label="Link de site externo" />

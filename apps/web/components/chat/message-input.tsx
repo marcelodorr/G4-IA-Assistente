@@ -45,37 +45,59 @@ export function MessageInput({
   };
 
   async function attach(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(`O arquivo deve ter no máximo ${MAX_UPLOAD_LABEL}`);
-      e.target.value = "";
-      return;
-    }
-    if (files.length >= CHAT_LIMITS.maxAttachments) {
+    const selectedFiles = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (selectedFiles.length === 0) return;
+
+    const availableSlots = CHAT_LIMITS.maxAttachments - files.length;
+    if (availableSlots <= 0) {
       toast.error(`Envie no máximo ${CHAT_LIMITS.maxAttachments} anexos`);
-      e.target.value = "";
       return;
     }
+
+    if (selectedFiles.length > availableSlots) {
+      toast.warning(`Somente ${availableSlots} ${availableSlots === 1 ? "arquivo será adicionado" : "arquivos serão adicionados"}. O limite é de ${CHAT_LIMITS.maxAttachments} anexos.`);
+    }
+
+    const filesWithinLimit = selectedFiles.slice(0, availableSlots);
+    const validFiles = filesWithinLimit.filter((file) => file.size <= MAX_UPLOAD_BYTES);
+    const oversizedCount = filesWithinLimit.length - validFiles.length;
+    if (oversizedCount > 0) {
+      toast.error(`${oversizedCount === 1 ? "Um arquivo excede" : `${oversizedCount} arquivos excedem`} o limite de ${MAX_UPLOAD_LABEL} por arquivo`);
+    }
+    if (validFiles.length === 0) return;
+
     setEnviandoArquivo(true);
-    const form = new FormData();
-    form.append("file", file);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: form });
-      if (!res.ok) {
-        toast.error((await res.json()).error ?? "Falha no upload");
-        return;
+      const results = await Promise.allSettled(validFiles.map(async (file) => {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `Falha no upload de ${file.name}`);
+        }
+        const meta = await res.json();
+        return { type: "file", url: meta.url, mediaType: meta.mediaType, filename: meta.filename } satisfies Attachment;
+      }));
+      const uploaded = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      const failed = results.filter((result) => result.status === "rejected");
+      if (uploaded.length > 0) {
+        setFiles((current) => [...current, ...uploaded].slice(0, CHAT_LIMITS.maxAttachments));
       }
-      const meta = await res.json();
-      setFiles((f) => [...f, { type: "file", url: meta.url, mediaType: meta.mediaType, filename: meta.filename }]);
+      if (failed.length === 1) {
+        toast.error(failed[0].reason instanceof Error ? failed[0].reason.message : "Falha no upload");
+      } else if (failed.length > 1) {
+        toast.error(`${failed.length} arquivos não puderam ser enviados`);
+      }
     } finally {
       setEnviandoArquivo(false);
-      e.target.value = "";
     }
   }
 
   async function attachLink() {
     if (!linkUrl.trim()) return;
+    if (enviandoArquivo) return;
     if (files.length >= CHAT_LIMITS.maxAttachments) return toast.error(`Envie no máximo ${CHAT_LIMITS.maxAttachments} anexos`);
     setEnviandoLink(true);
     try {
@@ -91,7 +113,7 @@ export function MessageInput({
   }
 
   function submit() {
-    if (disabled) return;
+    if (disabled || enviandoArquivo || enviandoLink) return;
     if (!text.trim() && files.length === 0) return;
     onSend(text.trim(), files, effectiveControls);
     setText("");
@@ -134,6 +156,7 @@ export function MessageInput({
         <input
           ref={inputRef}
           type="file"
+          multiple
           hidden
           accept=".md,.jpg,.jpeg,.png,.svg,.xlsx,.xls,.docx,.pptx,.html,.htm,.pdf,.txt,.csv,.json,.yaml,.yml,.webp"
           onChange={attach}
@@ -153,10 +176,10 @@ export function MessageInput({
           className="max-h-40 min-h-[44px] resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         <div className="mt-1 flex items-center gap-1">
-          <Button className="size-10 sm:size-8" variant="ghost" size="icon" onClick={() => inputRef.current?.click()} disabled={enviandoArquivo} aria-label="Anexar arquivo"><Paperclip /></Button>
-          <Button className="size-10 sm:size-8" variant={mostrarLink ? "secondary" : "ghost"} size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
+          <Button className="size-10 sm:size-8" variant="ghost" size="icon" onClick={() => inputRef.current?.click()} disabled={enviandoArquivo} aria-label="Anexar arquivos"><Paperclip /></Button>
+          <Button className="size-10 sm:size-8" variant={mostrarLink ? "secondary" : "ghost"} size="icon" onClick={() => setMostrarLink((value) => !value)} disabled={enviandoArquivo || enviandoLink} aria-label="Adicionar link de site externo"><LinkIcon /></Button>
           <div className="flex-1" />
-          <Button className="h-10 px-3 sm:h-8" onClick={submit} disabled={disabled} aria-label={effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar mensagem"}><SendHorizontal /><span className="hidden sm:inline">{effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar"}</span></Button>
+          <Button className="h-10 px-3 sm:h-8" onClick={submit} disabled={disabled || enviandoArquivo || enviandoLink} aria-label={effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar mensagem"}><SendHorizontal /><span className="hidden sm:inline">{effectiveControls.generationMode === "image" ? "Gerar imagem" : "Enviar"}</span></Button>
         </div>
       </div>
       <p className="mt-2 hidden text-center text-xs text-muted-foreground sm:block">
