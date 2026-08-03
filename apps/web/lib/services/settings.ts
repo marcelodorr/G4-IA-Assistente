@@ -22,6 +22,7 @@ export async function getSettings(db: Db) {
     defaultModel: row?.defaultModel ?? DEFAULT_MODEL,
     setupCompleted: row?.setupCompleted ?? false,
     hasKey: Boolean(row?.openaiKeyEncrypted),
+    hasElevenLabsKey: Boolean(row?.elevenlabsKeyEncrypted || process.env.ELEVENLABS_API_KEY?.trim()),
     dailyTokenLimit: row?.dailyTokenLimit ?? 200_000,
     weeklyTokenLimit: row?.weeklyTokenLimit ?? 1_000_000,
     monthlyTokenLimit: row?.monthlyTokenLimit ?? 4_000_000,
@@ -41,6 +42,19 @@ export async function getOpenAIKey(db: Db): Promise<string> {
   const row = await getRow(db);
   if (!row?.openaiKeyEncrypted) throw new Error("Chave OpenAI não configurada");
   return decrypt(row.openaiKeyEncrypted);
+}
+
+export async function saveElevenLabsKey(db: Db | Tx, key: string) {
+  if (!key.trim()) throw new Error("Chave ElevenLabs vazia");
+  await upsert(db, { elevenlabsKeyEncrypted: encrypt(key.trim()) });
+}
+
+export async function getElevenLabsKey(db: Db | Tx): Promise<string> {
+  const fromEnv = process.env.ELEVENLABS_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  const row = await getRow(db);
+  if (!row?.elevenlabsKeyEncrypted) throw new Error("Chave ElevenLabs não configurada pelo administrador");
+  return decrypt(row.elevenlabsKeyEncrypted);
 }
 
 export async function setDefaultModel(db: Db | Tx, model: string) {

@@ -52,6 +52,7 @@ export const invites = pgTable("invites", {
 export const settings = pgTable("settings", {
   id: integer("id").primaryKey().default(1),
   openaiKeyEncrypted: text("openai_key_encrypted"),
+  elevenlabsKeyEncrypted: text("elevenlabs_key_encrypted"),
   defaultModel: text("default_model").notNull().default("gpt-5-mini"),
   setupCompleted: boolean("setup_completed").notNull().default(false),
   dailyTokenLimit: integer("daily_token_limit").notNull().default(200000),

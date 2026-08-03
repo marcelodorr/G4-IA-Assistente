@@ -15,6 +15,7 @@ type AiSettings = Awaited<ReturnType<typeof getSettings>>;
 export function SettingsForm({ settings }: { settings: AiSettings }) {
   const router = useRouter();
   const [openaiKey, setOpenaiKey] = useState("");
+  const [elevenlabsKey, setElevenlabsKey] = useState("");
   const [modelo, setModelo] = useState(settings.defaultModel);
   const [dailyTokenLimit, setDailyTokenLimit] = useState(settings.dailyTokenLimit);
   const [weeklyTokenLimit, setWeeklyTokenLimit] = useState(settings.weeklyTokenLimit);
@@ -33,7 +34,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels, systemVersion }),
+      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, elevenlabsKey: elevenlabsKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels, systemVersion }),
     });
     setSalvando(false);
     if (!res.ok) {
@@ -42,6 +43,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
       return;
     }
     setOpenaiKey("");
+    setElevenlabsKey("");
     toast.success("Configurações salvas");
     router.refresh();
   }
@@ -57,6 +59,17 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
           <Label htmlFor="settings-system-version">Versão</Label>
           <Input id="settings-system-version" value={systemVersion} maxLength={40} onChange={(event) => setSystemVersion(event.target.value)} placeholder="Ex.: 1.0.0" />
           <p className="text-xs text-muted-foreground">Use letras, números, ponto, hífen, sublinhado ou “+”.</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>ElevenLabs</CardTitle>
+          <CardDescription>{settings.hasElevenLabsKey ? "Uma chave já está configurada para transcrição em tempo real." : "Configure a chave para habilitar a captura universal de reuniões."}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="settings-elevenlabs-key">Nova chave ElevenLabs</Label>
+          <Input id="settings-elevenlabs-key" type="password" value={elevenlabsKey} onChange={(event) => setElevenlabsKey(event.target.value)} placeholder="Deixe em branco para manter" autoComplete="new-password" />
+          <p className="text-xs text-muted-foreground">A chave fica criptografada e nunca é enviada ao navegador. O cliente recebe apenas tokens temporários de uso único.</p>
         </CardContent>
       </Card>
       <Card>

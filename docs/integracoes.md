@@ -55,7 +55,21 @@ Não coloque barra no final. Depois do deploy, use exatamente as URLs de callbac
 - O endpoint `POST /api/meetings/{meetingId}/transcript` recebe trechos com Bearer `TRANSCRIPTION_WEBHOOK_SECRET`. Payload: `{ "speaker": "Cliente", "text": "...", "isFinal": true, "source": "elevenlabs" }`.
 - A cada trecho final, o assistente analisa a transcrição recente e a própria base de conhecimento para gerar um insight.
 
-Limitação importante: Microsoft Graph não fornece o áudio bruto de uma reunião comum ao navegador. Para transcrever todas as partes será necessário, na próxima etapa, configurar a Transcript API do Teams após a reunião ou um bot de mídia/serviço de captura em tempo real conectado ao ElevenLabs. A tela atual já oferece o contrato de ingestão e a experiência ao vivo para essa integração.
+O Teams é opcional no módulo Reuniões. Sem conectar nenhuma agenda, o usuário pode criar uma reunião avulsa e usar a captura universal descrita abaixo.
+
+## Captura universal com ElevenLabs
+
+1. Em **Administração → Configurações**, cadastre uma chave ElevenLabs com acesso ao Scribe Realtime. Também é possível usar `ELEVENLABS_API_KEY` no ambiente.
+2. O administrador libera o **Módulo Reuniões** para o usuário.
+3. Em **Reuniões**, o usuário cria uma reunião pelo botão `+`, escolhe um assistente e clica em **Compartilhar áudio**.
+4. No seletor do navegador, escolhe a aba onde a chamada está acontecendo e marca **Compartilhar áudio da aba**.
+5. O sistema pede o microfone separadamente. Assim, a fala local é identificada como **Você** e o áudio da aba como **Reunião**.
+6. Dois canais PCM mono de 16 kHz são transmitidos ao Scribe v2 Realtime usando tokens temporários de uso único. A chave principal nunca chega ao navegador.
+7. Trechos consolidados alimentam o painel e disparam insights do assistente com intervalo mínimo de dez segundos.
+
+A captura funciona sem OAuth da plataforma de reunião. Ela depende de HTTPS e de um navegador que ofereça áudio em `getDisplayMedia`; Chrome e Edge são os alvos principais. Chamadas abertas somente em aplicativos desktop não disponibilizam seu áudio para a aba do navegador.
+
+O endpoint `POST /api/meetings/{meetingId}/transcript` continua disponível para integrações externas e exige sessão autenticada ou Bearer `TRANSCRIPTION_WEBHOOK_SECRET`.
 
 ## HubSpot
 

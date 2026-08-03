@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte, max, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lt, lte, max, or, sql } from "drizzle-orm";
 import { embed, generateText } from "ai";
 import type { Db } from "@/lib/db";
 import { assistants, meetingInsights, meetingTranscriptSegments, meetings, users } from "@/lib/db/schema";
@@ -35,9 +35,11 @@ export async function syncTeamsMeetings(db: Db, userId: string, from = new Date(
     const end = graphDate(event.end?.dateTime);
     const joinUrl = event.onlineMeeting?.joinUrl ?? event.onlineMeetingUrl ?? null;
     if (!event.id || !start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || (!event.isOnlineMeeting && !joinUrl)) continue;
+    const [existing] = await db.select({ status: meetings.status }).from(meetings).where(and(eq(meetings.userId, userId), eq(meetings.externalEventId, event.id))).limit(1);
+    const calendarStatus = event.isCancelled ? "cancelled" as const : end.getTime() < Date.now() ? "ended" as const : "scheduled" as const;
     const values = {
       title: event.subject?.trim() || "Reunião do Teams", joinUrl, startsAt: start, endsAt: end,
-      status: event.isCancelled ? "cancelled" as const : end.getTime() < Date.now() ? "ended" as const : "scheduled" as const,
+      status: existing?.status === "live" && !event.isCancelled ? "live" as const : calendarStatus,
       participants: (event.attendees ?? []).map((item) => ({ name: item.emailAddress?.name ?? null, email: item.emailAddress?.address ?? null, response: item.status?.response ?? null })),
       updatedAt: new Date(),
     };
@@ -50,6 +52,19 @@ export async function syncTeamsMeetings(db: Db, userId: string, from = new Date(
 export async function listMeetings(db: Db, userId: string, from = new Date(Date.now() - 12 * 3600_000), to = new Date(Date.now() + 14 * 86400_000)) {
   await requireMeetingsAccess(db, userId);
   return db.select().from(meetings).where(and(eq(meetings.userId, userId), gte(meetings.startsAt, from), lte(meetings.startsAt, to))).orderBy(asc(meetings.startsAt));
+}
+
+export async function createAdHocMeeting(db: Db, userId: string, input: { title: string; assistantId?: string | null }) {
+  await requireMeetingsAccess(db, userId);
+  const title = input.title.trim();
+  if (!title) throw new Error("Informe o nome da reunião");
+  if (input.assistantId && !(await canUserAccessAssistant(db, userId, input.assistantId))) throw new Error("Assistente não disponível para este usuário");
+  const startsAt = new Date();
+  const [meeting] = await db.insert(meetings).values({
+    userId, assistantId: input.assistantId ?? null, title: title.slice(0, 200), startsAt,
+    endsAt: new Date(startsAt.getTime() + 2 * 3600_000), status: "scheduled", participants: [],
+  }).returning();
+  return meeting;
 }
 
 export async function getMeetingState(db: Db, userId: string, meetingId: string) {
@@ -100,6 +115,12 @@ export async function generateMeetingInsight(db: Db, userId: string, meetingId: 
   const latestSequence = recent.at(-1)?.sequence ?? 0;
   const alreadyGenerated = state.insights.some((item) => item.basedOnSequence === latestSequence);
   if (alreadyGenerated) return null;
+  const now = new Date();
+  const claimed = await db.update(meetings).set({ lastInsightAt: now, updatedAt: now }).where(and(
+    eq(meetings.id, meetingId),
+    or(isNull(meetings.lastInsightAt), lt(meetings.lastInsightAt, new Date(now.getTime() - 10_000))),
+  )).returning({ id: meetings.id });
+  if (claimed.length === 0) return null;
   const transcript = recent.map((item) => `${item.speaker}: ${item.text}`).join("\n").slice(-14_000);
   const openai = await getProvider(db);
   let knowledge = "";
@@ -120,7 +141,6 @@ export async function generateMeetingInsight(db: Db, userId: string, meetingId: 
   const kind = kinds.includes(parsed.kind as typeof kinds[number]) ? parsed.kind as typeof kinds[number] : "suggestion";
   if (!parsed.title?.trim() || !parsed.content?.trim()) return null;
   const [insight] = await db.insert(meetingInsights).values({ meetingId, assistantId: assistant.id, kind, title: parsed.title.slice(0, 160), content: parsed.content.slice(0, 4_000), basedOnSequence: latestSequence }).returning();
-  await db.update(meetings).set({ lastInsightAt: new Date(), updatedAt: new Date() }).where(eq(meetings.id, meetingId));
   return insight;
 }
 
