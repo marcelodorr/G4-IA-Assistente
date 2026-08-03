@@ -16,6 +16,10 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
   const router = useRouter();
   const [openaiKey, setOpenaiKey] = useState("");
   const [elevenlabsKey, setElevenlabsKey] = useState("");
+  const [recallApiKey, setRecallApiKey] = useState("");
+  const [recallWebhookSecret, setRecallWebhookSecret] = useState("");
+  const [recallRegion, setRecallRegion] = useState(settings.recallRegion);
+  const [recallBotName, setRecallBotName] = useState(settings.recallBotName);
   const [modelo, setModelo] = useState(settings.defaultModel);
   const [dailyTokenLimit, setDailyTokenLimit] = useState(settings.dailyTokenLimit);
   const [weeklyTokenLimit, setWeeklyTokenLimit] = useState(settings.weeklyTokenLimit);
@@ -34,7 +38,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, elevenlabsKey: elevenlabsKey.trim() || undefined, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels, systemVersion }),
+      body: JSON.stringify({ openaiKey: openaiKey.trim() || undefined, elevenlabsKey: elevenlabsKey.trim() || undefined, recallApiKey: recallApiKey.trim() || undefined, recallWebhookSecret: recallWebhookSecret.trim() || undefined, recallRegion, recallBotName, defaultModel: modelo, dailyTokenLimit, weeklyTokenLimit, monthlyTokenLimit, maxOutputTokens, disabledModels, systemVersion }),
     });
     setSalvando(false);
     if (!res.ok) {
@@ -44,6 +48,7 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
     }
     setOpenaiKey("");
     setElevenlabsKey("");
+    setRecallApiKey(""); setRecallWebhookSecret("");
     toast.success("Configurações salvas");
     router.refresh();
   }
@@ -59,6 +64,18 @@ export function SettingsForm({ settings }: { settings: AiSettings }) {
           <Label htmlFor="settings-system-version">Versão</Label>
           <Input id="settings-system-version" value={systemVersion} maxLength={40} onChange={(event) => setSystemVersion(event.target.value)} placeholder="Ex.: 1.0.0" />
           <p className="text-xs text-muted-foreground">Use letras, números, ponto, hífen, sublinhado ou “+”.</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Bot de reuniões — Recall.ai</CardTitle>
+          <CardDescription>{settings.hasRecallApiKey && settings.hasRecallWebhookSecret ? "Bot configurado para Teams Desktop, Zoom e Google Meet." : "Configure o bot para capturar reuniões em aplicativos desktop no Windows e macOS."}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2"><Label htmlFor="settings-recall-key">API Key</Label><Input id="settings-recall-key" type="password" value={recallApiKey} onChange={(event) => setRecallApiKey(event.target.value)} placeholder={settings.hasRecallApiKey ? "Configurada — deixe em branco para manter" : "Obrigatória"} autoComplete="new-password" /></div>
+          <div className="space-y-2"><Label htmlFor="settings-recall-secret">Workspace Verification Secret</Label><Input id="settings-recall-secret" type="password" value={recallWebhookSecret} onChange={(event) => setRecallWebhookSecret(event.target.value)} placeholder={settings.hasRecallWebhookSecret ? "Configurado — deixe em branco para manter" : "whsec_..."} autoComplete="new-password" /></div>
+          <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label>Região</Label><Select value={recallRegion} onValueChange={setRecallRegion}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="us-east-1">US East</SelectItem><SelectItem value="us-west-2">US West</SelectItem><SelectItem value="eu-central-1">Europa</SelectItem><SelectItem value="ap-northeast-1">Ásia Pacífico</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label htmlFor="settings-recall-name">Nome exibido na reunião</Label><Input id="settings-recall-name" value={recallBotName} onChange={(event) => setRecallBotName(event.target.value)} maxLength={100} /></div></div>
+          <p className="text-xs text-muted-foreground">A região da chave, do segredo e dos bots deve ser a mesma. Cadastre também a chave ElevenLabs no painel da Recall.ai.</p>
         </CardContent>
       </Card>
       <Card>

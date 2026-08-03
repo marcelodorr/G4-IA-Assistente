@@ -23,6 +23,10 @@ export async function getSettings(db: Db) {
     setupCompleted: row?.setupCompleted ?? false,
     hasKey: Boolean(row?.openaiKeyEncrypted),
     hasElevenLabsKey: Boolean(row?.elevenlabsKeyEncrypted || process.env.ELEVENLABS_API_KEY?.trim()),
+    hasRecallApiKey: Boolean(row?.recallApiKeyEncrypted || process.env.RECALL_API_KEY?.trim()),
+    hasRecallWebhookSecret: Boolean(row?.recallWebhookSecretEncrypted || process.env.RECALL_WORKSPACE_VERIFICATION_SECRET?.trim()),
+    recallRegion: row?.recallRegion ?? process.env.RECALL_REGION ?? "us-east-1",
+    recallBotName: row?.recallBotName ?? "Sequor Copiloto",
     dailyTokenLimit: row?.dailyTokenLimit ?? 200_000,
     weeklyTokenLimit: row?.weeklyTokenLimit ?? 1_000_000,
     monthlyTokenLimit: row?.monthlyTokenLimit ?? 4_000_000,
@@ -55,6 +59,35 @@ export async function getElevenLabsKey(db: Db | Tx): Promise<string> {
   const row = await getRow(db);
   if (!row?.elevenlabsKeyEncrypted) throw new Error("Chave ElevenLabs não configurada pelo administrador");
   return decrypt(row.elevenlabsKeyEncrypted);
+}
+
+const RECALL_REGIONS = ["us-east-1", "us-west-2", "eu-central-1", "ap-northeast-1"] as const;
+export type RecallRegion = typeof RECALL_REGIONS[number];
+
+export function isRecallRegion(value: unknown): value is RecallRegion {
+  return typeof value === "string" && RECALL_REGIONS.includes(value as RecallRegion);
+}
+
+export async function saveRecallSettings(db: Db | Tx, input: { apiKey?: string; webhookSecret?: string; region: RecallRegion; botName: string }) {
+  const botName = input.botName.trim();
+  if (!botName) throw new Error("Nome do bot é obrigatório");
+  await upsert(db, {
+    ...(input.apiKey?.trim() ? { recallApiKeyEncrypted: encrypt(input.apiKey.trim()) } : {}),
+    ...(input.webhookSecret?.trim() ? { recallWebhookSecretEncrypted: encrypt(input.webhookSecret.trim()) } : {}),
+    recallRegion: input.region,
+    recallBotName: botName.slice(0, 100),
+  });
+}
+
+export async function getRecallConfig(db: Db | Tx) {
+  const row = await getRow(db);
+  const apiKey = process.env.RECALL_API_KEY?.trim() || (row?.recallApiKeyEncrypted ? decrypt(row.recallApiKeyEncrypted) : "");
+  const webhookSecret = process.env.RECALL_WORKSPACE_VERIFICATION_SECRET?.trim() || (row?.recallWebhookSecretEncrypted ? decrypt(row.recallWebhookSecretEncrypted) : "");
+  const region = process.env.RECALL_REGION?.trim() || row?.recallRegion || "us-east-1";
+  if (!apiKey) throw new Error("Recall.ai não configurado pelo administrador");
+  if (!webhookSecret) throw new Error("Segredo de verificação Recall.ai não configurado");
+  if (!isRecallRegion(region)) throw new Error("Região Recall.ai inválida");
+  return { apiKey, webhookSecret, region, botName: row?.recallBotName || "Sequor Copiloto" };
 }
 
 export async function setDefaultModel(db: Db | Tx, model: string) {

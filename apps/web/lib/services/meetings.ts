@@ -54,14 +54,20 @@ export async function listMeetings(db: Db, userId: string, from = new Date(Date.
   return db.select().from(meetings).where(and(eq(meetings.userId, userId), gte(meetings.startsAt, from), lte(meetings.startsAt, to))).orderBy(asc(meetings.startsAt));
 }
 
-export async function createAdHocMeeting(db: Db, userId: string, input: { title: string; assistantId?: string | null }) {
+export async function createAdHocMeeting(db: Db, userId: string, input: { title: string; assistantId?: string | null; joinUrl?: string | null }) {
   await requireMeetingsAccess(db, userId);
   const title = input.title.trim();
   if (!title) throw new Error("Informe o nome da reunião");
   if (input.assistantId && !(await canUserAccessAssistant(db, userId, input.assistantId))) throw new Error("Assistente não disponível para este usuário");
+  let joinUrl: string | null = null;
+  if (input.joinUrl?.trim()) {
+    const parsed = new URL(input.joinUrl.trim());
+    if (parsed.protocol !== "https:") throw new Error("O link da reunião deve usar HTTPS");
+    joinUrl = parsed.toString();
+  }
   const startsAt = new Date();
   const [meeting] = await db.insert(meetings).values({
-    userId, assistantId: input.assistantId ?? null, title: title.slice(0, 200), startsAt,
+    userId, assistantId: input.assistantId ?? null, title: title.slice(0, 200), joinUrl, startsAt,
     endsAt: new Date(startsAt.getTime() + 2 * 3600_000), status: "scheduled", participants: [],
   }).returning();
   return meeting;

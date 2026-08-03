@@ -59,6 +59,23 @@ O Teams é opcional no módulo Reuniões. Sem conectar nenhuma agenda, o usuári
 
 ## Captura universal com ElevenLabs
 
+### Modo recomendado: bot participante
+
+Para funcionar como Read AI em chamadas abertas no Teams Desktop, Zoom ou Google Meet:
+
+1. Crie uma conta Recall.ai e escolha uma região única para todos os recursos.
+2. Cadastre a chave ElevenLabs como provedor de transcrição no dashboard da Recall.ai.
+3. Gere uma API Key e um Workspace Verification Secret (`whsec_...`) na mesma região.
+4. Em **Administração → Configurações → Bot de reuniões**, informe a chave, o segredo, a região e o nome que aparecerá na lista de participantes.
+5. No dashboard de webhooks da Recall.ai, cadastre `https://SEU_DOMINIO/api/meetings/recall/webhook` para eventos `bot.*`. O endpoint de transcrição ao vivo é configurado automaticamente em cada bot.
+6. O usuário cria ou seleciona a reunião, escolhe o assistente e clica em **Enviar copiloto**. Se houver sala de espera, o organizador precisa admitir o bot.
+
+O backend envia o bot ao link da call e configura `elevenlabs_streaming` com Scribe v2 Realtime. Cada evento `transcript.data` é validado por HMAC antes de ser persistido. O nome do participante fornecido pela plataforma é preservado e o trecho dispara o pipeline de insights.
+
+Para produção, `APP_URL` precisa ser uma URL HTTPS pública e estável. API Key, Workspace Secret e região são específicos da mesma região Recall.ai.
+
+### Alternativa: captura local do navegador
+
 1. Em **Administração → Configurações**, cadastre uma chave ElevenLabs com acesso ao Scribe Realtime. Também é possível usar `ELEVENLABS_API_KEY` no ambiente.
 2. O administrador libera o **Módulo Reuniões** para o usuário.
 3. Em **Reuniões**, o usuário cria uma reunião pelo botão `+`, escolhe um assistente e clica em **Compartilhar áudio**.

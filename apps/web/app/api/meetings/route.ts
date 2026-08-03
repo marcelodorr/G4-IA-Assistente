@@ -19,7 +19,7 @@ export const GET = apiHandler(async (req) => {
 
 export const POST = apiHandler(async (req) => {
   const session = await requireSession();
-  const body = await req.json() as { title?: string; assistantId?: string | null };
+  const body = await req.json() as { title?: string; assistantId?: string | null; joinUrl?: string | null };
   if (typeof body.title !== "string") return Response.json({ error: "Nome da reunião inválido" }, { status: 400 });
-  return Response.json(await createAdHocMeeting(db, session.user.id, { title: body.title, assistantId: body.assistantId }), { status: 201 });
+  return Response.json(await createAdHocMeeting(db, session.user.id, { title: body.title, assistantId: body.assistantId, joinUrl: body.joinUrl }), { status: 201 });
 });

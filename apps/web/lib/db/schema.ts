@@ -53,6 +53,10 @@ export const settings = pgTable("settings", {
   id: integer("id").primaryKey().default(1),
   openaiKeyEncrypted: text("openai_key_encrypted"),
   elevenlabsKeyEncrypted: text("elevenlabs_key_encrypted"),
+  recallApiKeyEncrypted: text("recall_api_key_encrypted"),
+  recallWebhookSecretEncrypted: text("recall_webhook_secret_encrypted"),
+  recallRegion: text("recall_region").notNull().default("us-east-1"),
+  recallBotName: text("recall_bot_name").notNull().default("Sequor Copiloto"),
   defaultModel: text("default_model").notNull().default("gpt-5-mini"),
   setupCompleted: boolean("setup_completed").notNull().default(false),
   dailyTokenLimit: integer("daily_token_limit").notNull().default(200000),
@@ -222,6 +226,8 @@ export const meetings = pgTable("meetings", {
   assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
   externalEventId: text("external_event_id"),
   externalMeetingId: text("external_meeting_id"),
+  recallBotId: text("recall_bot_id"),
+  recallBotStatus: text("recall_bot_status"),
   title: text("title").notNull(),
   joinUrl: text("join_url"),
   startsAt: timestamp("starts_at").notNull(),
@@ -233,6 +239,7 @@ export const meetings = pgTable("meetings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("meetings_user_external_event_idx").on(t.userId, t.externalEventId),
+  uniqueIndex("meetings_recall_bot_idx").on(t.recallBotId),
   index("meetings_user_starts_idx").on(t.userId, t.startsAt),
   index("meetings_user_status_idx").on(t.userId, t.status),
 ]);
