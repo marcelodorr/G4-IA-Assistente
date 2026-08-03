@@ -9,6 +9,7 @@ export async function listUsers(db: Db) {
     role: users.role, active: users.active, dailyTokenLimit: users.dailyTokenLimit,
     weeklyTokenLimit: users.weeklyTokenLimit, monthlyTokenLimit: users.monthlyTokenLimit,
     allowedModels: users.allowedModels, assistantAccessMode: users.assistantAccessMode,
+    meetingsEnabled: users.meetingsEnabled,
     lastLoginAt: users.lastLoginAt, createdAt: users.createdAt,
   }).from(users).orderBy(users.createdAt);
   const access = await db.select().from(userAssistantAccess);
@@ -98,6 +99,7 @@ export async function setUserPermissions(db: Db, id: string, input: {
   allowedModels: string[] | null;
   assistantAccessMode: "all" | "selected";
   assistantIds: string[];
+  meetingsEnabled?: boolean;
 }) {
   const allowedModels = input.allowedModels === null ? null : [...new Set(input.allowedModels)];
   if (allowedModels?.some((model) => !isAllowedModel(model))) throw new Error("Modelo inválido");
@@ -110,6 +112,7 @@ export async function setUserPermissions(db: Db, id: string, input: {
     const updated = await tx.update(users).set({
       allowedModels,
       assistantAccessMode: input.assistantAccessMode,
+      ...(typeof input.meetingsEnabled === "boolean" ? { meetingsEnabled: input.meetingsEnabled } : {}),
     }).where(eq(users.id, id)).returning({ id: users.id });
     if (updated.length === 0) throw new Error("Usuário não encontrado");
     await tx.delete(userAssistantAccess).where(eq(userAssistantAccess.userId, id));

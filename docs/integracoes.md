@@ -1,6 +1,6 @@
 # Integrações — guia passo a passo
 
-Esta fase adiciona Google Calendar, HubSpot, Pipedrive, Apify e Jira ao Sequor IA Assistente.
+Esta fase adiciona Google Calendar, Microsoft Teams, HubSpot, Pipedrive, Apify, Jira e GitBook ao Sequor IA Assistente.
 
 ## Como funciona
 
@@ -45,6 +45,18 @@ Não coloque barra no final. Depois do deploy, use exatamente as URLs de callbac
 - Escopos utilizados: perfil básico e `calendar.readonly`.
 - Referência: <https://developers.google.com/identity/protocols/oauth2/web-server>
 
+## Microsoft Teams e módulo Reuniões
+
+- Registre uma aplicação Web no Microsoft Entra ID e cadastre a callback exibida no painel.
+- Adicione as permissões delegadas `User.Read`, `Calendars.Read` e `OnlineMeetings.Read`, além de `openid`, `profile`, `email` e `offline_access`.
+- Se a empresa for single-tenant, defina `MICROSOFT_TENANT_ID`; sem essa variável o OAuth usa o tenant `common`.
+- O administrador ativa a integração, escolhe o modo individual e libera os usuários. No painel **Usuários → Acessos e limites**, também deve habilitar o **Módulo Reuniões** para cada pessoa.
+- O módulo sincroniza a agenda enquanto está aberto, permite abrir a call no Teams e associa um assistente já existente ao acompanhamento.
+- O endpoint `POST /api/meetings/{meetingId}/transcript` recebe trechos com Bearer `TRANSCRIPTION_WEBHOOK_SECRET`. Payload: `{ "speaker": "Cliente", "text": "...", "isFinal": true, "source": "elevenlabs" }`.
+- A cada trecho final, o assistente analisa a transcrição recente e a própria base de conhecimento para gerar um insight.
+
+Limitação importante: Microsoft Graph não fornece o áudio bruto de uma reunião comum ao navegador. Para transcrever todas as partes será necessário, na próxima etapa, configurar a Transcript API do Teams após a reunião ou um bot de mídia/serviço de captura em tempo real conectado ao ElevenLabs. A tela atual já oferece o contrato de ingestão e a experiência ao vivo para essa integração.
+
 ## HubSpot
 
 - Crie um aplicativo público no HubSpot Developer.
@@ -80,6 +92,7 @@ Não coloque barra no final. Depois do deploy, use exatamente as URLs de callbac
 | Integração | Consultas iniciais |
 |---|---|
 | Google Calendar | Eventos por período e termo |
+| Microsoft Teams | Reuniões online do calendário por período |
 | HubSpot | Contatos, empresas e negócios |
 | Pipedrive | Negócios, pessoas e organizações |
 | Apify | Datasets, Actors, execuções e itens de dataset |

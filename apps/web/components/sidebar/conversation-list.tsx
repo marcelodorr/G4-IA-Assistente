@@ -20,7 +20,7 @@ import { UserUsageWidget } from "@/components/usage/user-usage-widget";
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
-type SidebarUser = Session["user"] & { username?: string | null; avatarUrl?: string | null };
+type SidebarUser = Session["user"] & { username?: string | null; avatarUrl?: string | null; meetingsEnabled?: boolean };
 
 export function ConversationList({ conversations, projects, user, usage, liveUsage }: { conversations: ConversationRow[]; projects: ProjectRow[]; user: SidebarUser; usage: Usage | null; liveUsage: boolean }) {
   const pathname = usePathname();

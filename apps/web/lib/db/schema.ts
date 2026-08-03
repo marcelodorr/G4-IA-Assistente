@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   monthlyTokenLimit: integer("monthly_token_limit"),
   allowedModels: jsonb("allowed_models"),
   assistantAccessMode: text("assistant_access_mode", { enum: ["all", "selected"] }).notNull().default("all"),
+  meetingsEnabled: boolean("meetings_enabled").notNull().default(false),
   username: text("username").unique(),
   avatarStoragePath: text("avatar_storage_path"),
   sessionVersion: integer("session_version").notNull().default(1),
@@ -97,7 +98,7 @@ export const assistants = pgTable("assistants", {
   systemPrompt: text("system_prompt").notNull(),
   model: text("model"),
   agentType: text("agent_type", { enum: ["chat", "image", "budget", "presentation", "document"] }).notNull().default("chat"),
-  integrationProvider: text("integration_provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }),
+  integrationProvider: text("integration_provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }),
   active: boolean("active").notNull().default(true),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -148,7 +149,7 @@ export const projectChunks = pgTable("project_chunks", {
 ]);
 
 export const integrationConfigs = pgTable("integration_configs", {
-  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).primaryKey(),
+  provider: text("provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).primaryKey(),
   active: boolean("active").notNull().default(false),
   connectionMode: text("connection_mode", { enum: ["individual", "universal"] }).notNull().default("individual"),
   universalConnectionUserId: uuid("universal_connection_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -160,7 +161,7 @@ export const integrationConfigs = pgTable("integration_configs", {
 
 export const userIntegrationAccess = pgTable("user_integration_access", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
+  provider: text("provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   primaryKey({ columns: [t.userId, t.provider] }),
@@ -170,7 +171,7 @@ export const userIntegrationAccess = pgTable("user_integration_access", {
 export const integrationConnections = pgTable("integration_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
+  provider: text("provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
   status: text("status", { enum: ["connected", "error", "revoked"] }).notNull().default("connected"),
   accessTokenEncrypted: text("access_token_encrypted").notNull(),
   refreshTokenEncrypted: text("refresh_token_encrypted"),
@@ -191,7 +192,7 @@ export const integrationConnections = pgTable("integration_connections", {
 export const integrationOauthStates = pgTable("integration_oauth_states", {
   tokenHash: text("token_hash").primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "jira"] }).notNull(),
+  provider: text("provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "jira"] }).notNull(),
   connectionMode: text("connection_mode", { enum: ["individual", "universal"] }).notNull().default("individual"),
   redirectUri: text("redirect_uri").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -202,7 +203,7 @@ export const integrationActivity = pgTable("integration_activity", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
-  provider: text("provider", { enum: ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
+  provider: text("provider", { enum: ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] }).notNull(),
   action: text("action").notNull(),
   requestSummary: jsonb("request_summary").notNull().default({}),
   resultContent: text("result_content"),
@@ -213,6 +214,53 @@ export const integrationActivity = pgTable("integration_activity", {
   index("integration_activity_user_created_idx").on(t.userId, t.createdAt),
   index("integration_activity_provider_created_idx").on(t.provider, t.createdAt),
 ]);
+
+export const meetings = pgTable("meetings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
+  externalEventId: text("external_event_id"),
+  externalMeetingId: text("external_meeting_id"),
+  title: text("title").notNull(),
+  joinUrl: text("join_url"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  status: text("status", { enum: ["scheduled", "live", "ended", "cancelled"] }).notNull().default("scheduled"),
+  participants: jsonb("participants").notNull().default([]),
+  lastInsightAt: timestamp("last_insight_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("meetings_user_external_event_idx").on(t.userId, t.externalEventId),
+  index("meetings_user_starts_idx").on(t.userId, t.startsAt),
+  index("meetings_user_status_idx").on(t.userId, t.status),
+]);
+
+export const meetingTranscriptSegments = pgTable("meeting_transcript_segments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingId: uuid("meeting_id").notNull().references(() => meetings.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  speaker: text("speaker").notNull().default("Participante"),
+  text: text("text").notNull(),
+  spokenAt: timestamp("spoken_at").notNull().defaultNow(),
+  isFinal: boolean("is_final").notNull().default(true),
+  source: text("source", { enum: ["manual", "elevenlabs", "teams"] }).notNull().default("manual"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("meeting_transcript_sequence_idx").on(t.meetingId, t.sequence),
+  index("meeting_transcript_meeting_created_idx").on(t.meetingId, t.createdAt),
+]);
+
+export const meetingInsights = pgTable("meeting_insights", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingId: uuid("meeting_id").notNull().references(() => meetings.id, { onDelete: "cascade" }),
+  assistantId: uuid("assistant_id").references(() => assistants.id, { onDelete: "set null" }),
+  kind: text("kind", { enum: ["objection", "question", "opportunity", "risk", "suggestion", "summary"] }).notNull().default("suggestion"),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  basedOnSequence: integer("based_on_sequence"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("meeting_insights_meeting_created_idx").on(t.meetingId, t.createdAt)]);
 
 export const assistantFiles = pgTable("assistant_files", {
   id: uuid("id").primaryKey().defaultRandom(),

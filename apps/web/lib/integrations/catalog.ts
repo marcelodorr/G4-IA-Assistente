@@ -1,4 +1,4 @@
-export const INTEGRATION_PROVIDERS = ["google_calendar", "hubspot", "pipedrive", "apify", "jira", "gitbook"] as const;
+export const INTEGRATION_PROVIDERS = ["google_calendar", "microsoft_teams", "hubspot", "pipedrive", "apify", "jira", "gitbook"] as const;
 export type IntegrationProvider = typeof INTEGRATION_PROVIDERS[number];
 
 export type IntegrationDefinition = {
@@ -17,6 +17,7 @@ export type IntegrationDefinition = {
   tokenLabel?: string;
   tokenPlaceholder?: string;
   tokenHelp?: string;
+  individualOnly?: boolean;
 };
 
 export const INTEGRATIONS: Record<IntegrationProvider, IntegrationDefinition> = {
@@ -33,6 +34,21 @@ export const INTEGRATIONS: Record<IntegrationProvider, IntegrationDefinition> = 
     examplePrompts: ["Quais compromissos tenho hoje no Google Calendar?", "Resuma minha agenda da próxima semana e destaque reuniões com clientes.", "Procure no meu calendário eventos sobre o projeto MES nos próximos 30 dias."],
     limitations: ["Somente leitura: não cria, edita ou cancela eventos", "Consulta o calendário principal", "Retorna no máximo 50 eventos por chamada"],
     scopes: ["openid", "email", "profile", "https://www.googleapis.com/auth/calendar.readonly"],
+  },
+  microsoft_teams: {
+    id: "microsoft_teams",
+    name: "Microsoft Teams",
+    description: "Sincroniza a agenda do Microsoft 365 e permite acompanhar reuniões do Teams no Sequor.",
+    authType: "oauth",
+    individualOnly: true,
+    color: "#6264A7",
+    docsUrl: "https://learn.microsoft.com/graph/auth-v2-user",
+    setupSteps: ["Registre um aplicativo no Microsoft Entra ID.", "Configure como Web a URL de callback exibida abaixo.", "Adicione as permissões delegadas User.Read, Calendars.Read e OnlineMeetings.Read; habilite refresh tokens."],
+    userSteps: ["Clique em Conectar e entre com sua conta Microsoft corporativa.", "Autorize a leitura do perfil, calendário e reuniões online.", "Abra o módulo Reuniões para acompanhar sua agenda e entrar nas calls."],
+    capabilities: ["Sincronizar reuniões do calendário em tempo quase real", "Abrir uma reunião do Teams dentro do fluxo do sistema", "Associar um assistente para insights", "Receber transcrições de um provedor externo em tempo real"],
+    examplePrompts: ["Mostre minhas reuniões do Teams de hoje.", "Abra o acompanhamento da próxima call de vendas."],
+    limitations: ["O Teams não entrega o áudio de uma call comum diretamente ao navegador", "Transcrição de todas as partes exige transcript API do Teams ou um bot de mídia/provedor como ElevenLabs", "A agenda é atualizada por polling enquanto o módulo está aberto"],
+    scopes: ["openid", "profile", "email", "offline_access", "User.Read", "Calendars.Read", "OnlineMeetings.Read"],
   },
   hubspot: {
     id: "hubspot",

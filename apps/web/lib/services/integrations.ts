@@ -41,7 +41,7 @@ export async function updateIntegrationConfig(db: Db, provider: IntegrationProvi
   updatedBy: string;
 }) {
   const definition = INTEGRATIONS[provider];
-  const connectionMode = input.connectionMode ?? "individual";
+  const connectionMode = definition.individualOnly ? "individual" : input.connectionMode ?? "individual";
   const clientId = definition.authType === "oauth" ? input.clientId?.trim() || null : null;
   const existing = (await db.select().from(integrationConfigs).where(eq(integrationConfigs.provider, provider)))[0];
   const clientSecretEncrypted = input.clearSecret ? null

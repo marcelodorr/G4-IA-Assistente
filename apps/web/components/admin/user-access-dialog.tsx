@@ -35,6 +35,7 @@ export function UserAccessDialog({
   const [models, setModels] = useState(user.allowedModels ?? enabledModels);
   const [assistantMode, setAssistantMode] = useState<"all" | "selected">(user.assistantAccessMode);
   const [assistantIds, setAssistantIds] = useState(user.assistantIds);
+  const [meetingsEnabled, setMeetingsEnabled] = useState(user.meetingsEnabled);
 
   function toggle(list: string[], value: string, setter: (next: string[]) => void) {
     setter(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
@@ -51,6 +52,7 @@ export function UserAccessDialog({
         allowedModels: modelMode === "all" ? null : models,
         assistantAccessMode: assistantMode,
         assistantIds: assistantMode === "all" ? [] : assistantIds,
+        meetingsEnabled,
       }),
     });
     setSaving(false);
@@ -73,6 +75,10 @@ export function UserAccessDialog({
             <div className="space-y-2"><Label htmlFor={`weekly-${user.id}`}>Semanal</Label><Input id={`weekly-${user.id}`} type="number" min={1000} value={weekly} placeholder={String(globalQuotas.weekly)} onChange={(event) => setWeekly(event.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor={`monthly-${user.id}`}>Mensal</Label><Input id={`monthly-${user.id}`} type="number" min={1000} value={monthly} placeholder={String(globalQuotas.monthly)} onChange={(event) => setMonthly(event.target.value)} /></div>
           </div>
+        </section>
+
+        <section className="rounded-lg border p-4">
+          <label className="flex items-center justify-between gap-4"><span><span className="block font-medium">Módulo Reuniões</span><span className="block text-xs text-muted-foreground">Libera agenda do Teams, transcrição e insights em tempo real para este usuário.</span></span><input type="checkbox" checked={meetingsEnabled} onChange={(event) => setMeetingsEnabled(event.target.checked)} /></label>
         </section>
 
         <section className="space-y-3 rounded-lg border p-4">

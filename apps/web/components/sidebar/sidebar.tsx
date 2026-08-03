@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Session } from "next-auth";
-import { FolderKanban, Menu, MessageSquarePlus } from "lucide-react";
+import { FolderKanban, Menu, MessageSquarePlus, Video } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { ConversationList } from "@/components/sidebar/conversation-list";
@@ -15,14 +15,14 @@ import { NotificationCenter } from "@/components/system/notification-center";
 type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
 type ProjectRow = Awaited<ReturnType<typeof listProjects>>[number];
 type Usage = Awaited<ReturnType<typeof getUserUsageSummary>>;
-type Props = { user: Session["user"] & { username?: string | null; avatarUrl?: string | null }; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage | null; systemVersion: string };
+type Props = { user: Session["user"] & { username?: string | null; avatarUrl?: string | null; meetingsEnabled?: boolean }; conversations: ConversationRow[]; projects: ProjectRow[]; usage: Usage | null; systemVersion: string };
 
 function Brand({ systemVersion, notifications = false }: { systemVersion: string; notifications?: boolean }) {
   return <div className="flex min-w-0 items-center gap-2"><Logo className="h-6 min-w-0 w-auto" /><span className="shrink-0 rounded-full border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">v{systemVersion}</span>{notifications && <div className="ml-auto"><NotificationCenter /></div>}</div>;
 }
 
 function SidebarContent({ user, conversations, projects, usage, systemVersion, live, notifications = false }: Props & { live: boolean; notifications?: boolean }) {
-  return <><div className="p-4"><Brand systemVersion={systemVersion} notifications={notifications} /></div><div className="grid grid-cols-[1fr_auto] gap-2 px-3 pb-3"><Button asChild className="justify-start"><Link href="/"><MessageSquarePlus />Novo chat</Link></Button><Button asChild variant="outline" size="icon" title="Gerenciar projetos"><Link href="/projetos" aria-label="Gerenciar projetos"><FolderKanban /></Link></Button></div><ConversationList conversations={conversations} projects={projects} user={user} usage={usage} liveUsage={live} /></>;
+  return <><div className="p-4"><Brand systemVersion={systemVersion} notifications={notifications} /></div><div className="grid grid-cols-[1fr_auto] gap-2 px-3 pb-2"><Button asChild className="justify-start"><Link href="/"><MessageSquarePlus />Novo chat</Link></Button><Button asChild variant="outline" size="icon" title="Gerenciar projetos"><Link href="/projetos" aria-label="Gerenciar projetos"><FolderKanban /></Link></Button></div>{user.meetingsEnabled && <div className="px-3 pb-3"><Button asChild variant="outline" className="w-full justify-start"><Link href="/reunioes"><Video />Reuniões</Link></Button></div>}<ConversationList conversations={conversations} projects={projects} user={user} usage={usage} liveUsage={live} /></>;
 }
 
 export function Sidebar(props: Props) {

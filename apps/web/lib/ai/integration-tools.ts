@@ -28,6 +28,16 @@ export async function createIntegrationTools(db: Db, owner: Owner, options?: { b
     execute: (params) => execute("google_calendar", "list_events", params),
   });
 
+  if (connected.has("microsoft_teams")) tools.consultarMicrosoftTeams = tool({
+    description: "Consulta a agenda atual de reuniões do Microsoft Teams do usuário. Somente leitura.",
+    inputSchema: z.object({
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+      limit: z.number().int().min(1).max(50).default(20),
+    }),
+    execute: (params) => execute("microsoft_teams", "list_meetings", params),
+  });
+
   if (connected.has("hubspot")) tools.consultarHubSpot = tool({
     description: "Consulta dados atuais e somente leitura no HubSpot do usuário: contatos, empresas ou negócios.",
     inputSchema: z.object({ resource: z.enum(["contacts", "companies", "deals"]), query: z.string().max(200).optional(), limit: z.number().int().min(1).max(50).default(20) }),

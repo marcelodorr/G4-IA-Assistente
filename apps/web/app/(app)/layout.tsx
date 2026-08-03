@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) redirect("/login");
   // A sessão JWT continua válida após a desativação do usuário; confirma no banco
   // a cada navegação para não deixar um usuário desativado usar o app.
-  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion, name: users.name, username: users.username, avatarStoragePath: users.avatarStoragePath }).from(users).where(eq(users.id, session.user.id));
+  const [user] = await db.select({ active: users.active, sessionVersion: users.sessionVersion, name: users.name, username: users.username, avatarStoragePath: users.avatarStoragePath, meetingsEnabled: users.meetingsEnabled }).from(users).where(eq(users.id, session.user.id));
   if (!user || !user.active || user.sessionVersion !== session.user.sessionVersion) redirect("/login");
   const [convs, projects, usage, systemSettings] = await Promise.all([
     listConversations(db, session.user.id),
@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden">
-      <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null }} conversations={convs} projects={projects} usage={usage} systemVersion={systemSettings?.systemVersion ?? process.env.APP_VERSION ?? "0.1.0"} />
+      <Sidebar user={{ ...session.user, name: user.name, username: user.username, avatarUrl: user.avatarStoragePath ? "/api/profile/avatar" : null, meetingsEnabled: user.meetingsEnabled }} conversations={convs} projects={projects} usage={usage} systemVersion={systemSettings?.systemVersion ?? process.env.APP_VERSION ?? "0.1.0"} />
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">{children}</main>
     </div>
   );

@@ -33,6 +33,20 @@ async function googleCalendar(token: string, input: QueryInput) {
   return fetchJson(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
+export async function microsoftTeamsCalendar(token: string, input: QueryInput) {
+  const startDateTime = typeof input.from === "string" ? new Date(input.from).toISOString() : new Date().toISOString();
+  const endDateTime = typeof input.to === "string" ? new Date(input.to).toISOString() : new Date(Date.now() + 7 * 86400_000).toISOString();
+  const params = new URLSearchParams({
+    startDateTime, endDateTime,
+    "$top": String(clampLimit(input.limit, 50)),
+    "$orderby": "start/dateTime",
+    "$select": "id,subject,start,end,isOnlineMeeting,onlineMeeting,onlineMeetingUrl,attendees,organizer,isCancelled,lastModifiedDateTime",
+  });
+  return fetchJson(`https://graph.microsoft.com/v1.0/me/calendarView?${params}`, {
+    headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="UTC"' },
+  });
+}
+
 const HUBSPOT_PROPERTIES: Record<string, string[]> = {
   contacts: ["firstname", "lastname", "email", "phone", "company", "lifecyclestage", "lastmodifieddate"],
   companies: ["name", "domain", "industry", "city", "phone", "hs_lastmodifieddate"],
@@ -136,6 +150,7 @@ export async function executeIntegrationQuery(db: Db, input: {
     connectionId = connection.id;
     let result: unknown;
     if (input.provider === "google_calendar") result = await googleCalendar(token, input.params);
+    else if (input.provider === "microsoft_teams") result = await microsoftTeamsCalendar(token, input.params);
     else if (input.provider === "hubspot") result = await hubspot(token, input.params);
     else if (input.provider === "pipedrive") result = await pipedrive(token, String((connection.metadata as Record<string, unknown>).apiDomain ?? "https://api.pipedrive.com"), input.params);
     else if (input.provider === "apify") result = await apify(token, input.params);
@@ -185,6 +200,7 @@ export async function connectGitBook(db: Db, userId: string, token: string) {
 export function syncIntegrationSnapshot(db: Db, userId: string, provider: IntegrationProvider) {
   const defaults: Record<IntegrationProvider, { action: string; params: QueryInput }> = {
     google_calendar: { action: "initial_events", params: { limit: 30 } },
+    microsoft_teams: { action: "initial_meetings", params: { limit: 30 } },
     hubspot: { action: "initial_deals", params: { resource: "deals", limit: 30 } },
     pipedrive: { action: "initial_deals", params: { resource: "deals", limit: 30 } },
     apify: { action: "initial_datasets", params: { action: "list_datasets", limit: 30 } },

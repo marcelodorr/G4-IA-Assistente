@@ -33,6 +33,12 @@ export async function buildAuthorizationUrl(db: Db, provider: OAuthProvider, sta
     url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: redirectUri, response_type: "code", scope: scopes, access_type: "offline", include_granted_scopes: "true", prompt: "consent", state }).toString();
     return url.toString();
   }
+  if (provider === "microsoft_teams") {
+    const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "common";
+    const url = new URL(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`);
+    url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: redirectUri, response_type: "code", response_mode: "query", scope: scopes, prompt: "select_account", state }).toString();
+    return url.toString();
+  }
   if (provider === "hubspot") {
     const url = new URL("https://app.hubspot.com/oauth/authorize");
     url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: redirectUri, scope: scopes, state }).toString();
@@ -63,14 +69,16 @@ async function requestOAuthToken(db: Db, provider: OAuthProvider, values: Record
       body: JSON.stringify({ client_id: config.clientId, client_secret: config.clientSecret, ...values }),
     }));
   }
+  const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "common";
   const endpoint = provider === "google_calendar" ? "https://oauth2.googleapis.com/token"
+    : provider === "microsoft_teams" ? `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`
     : provider === "hubspot" ? "https://api.hubapi.com/oauth/v3/token"
       : "https://oauth.pipedrive.com/oauth/token";
   const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
   const body = new URLSearchParams(values);
   if (provider === "pipedrive") headers.Authorization = `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`;
   else { body.set("client_id", config.clientId); body.set("client_secret", config.clientSecret); }
-  if (refresh && provider === "google_calendar") body.delete("redirect_uri");
+  if (refresh && (provider === "google_calendar" || provider === "microsoft_teams")) body.delete("redirect_uri");
   return parseTokenResponse(await fetch(endpoint, { method: "POST", headers, body, signal: AbortSignal.timeout(20_000) }));
 }
 
@@ -83,6 +91,11 @@ export async function exchangeAuthorizationCode(db: Db, userId: string, provider
     const profile = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(15_000) }).then((response) => response.ok ? response.json() : null) as { sub?: string; email?: string; name?: string } | null;
     externalAccountId = profile?.sub ?? null;
     accountLabel = profile?.email ?? profile?.name ?? "Google Calendar conectado";
+  } else if (provider === "microsoft_teams") {
+    const profile = await fetch("https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName", { headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(15_000) }).then((response) => response.ok ? response.json() : null) as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string } | null;
+    externalAccountId = profile?.id ?? null;
+    accountLabel = profile?.mail ?? profile?.userPrincipalName ?? profile?.displayName ?? "Microsoft Teams conectado";
+    metadata = { displayName: profile?.displayName ?? null };
   } else if (provider === "pipedrive") {
     const apiDomain = token.api_domain ?? "https://api.pipedrive.com";
     const profile = await fetch(`${apiDomain}/api/v1/users/me`, { headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(15_000) }).then((response) => response.ok ? response.json() : null) as { data?: { id?: number; name?: string; email?: string; company_name?: string } } | null;

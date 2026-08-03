@@ -16,7 +16,7 @@ export const PATCH = apiHandler(async (req, { params }) => {
       monthlyTokenLimit: body.monthlyTokenLimit === null ? null : Number(body.monthlyTokenLimit),
     });
   }
-  if ("allowedModels" in body || "assistantAccessMode" in body || "assistantIds" in body) {
+  if ("allowedModels" in body || "assistantAccessMode" in body || "assistantIds" in body || "meetingsEnabled" in body) {
     if (body.allowedModels !== null && !Array.isArray(body.allowedModels)) throw new Error("Lista de modelos inválida");
     if (body.assistantAccessMode !== "all" && body.assistantAccessMode !== "selected") throw new Error("Modo de acesso inválido");
     if (!Array.isArray(body.assistantIds)) throw new Error("Lista de assistentes inválida");
@@ -24,6 +24,7 @@ export const PATCH = apiHandler(async (req, { params }) => {
       allowedModels: body.allowedModels,
       assistantAccessMode: body.assistantAccessMode,
       assistantIds: body.assistantIds,
+      meetingsEnabled: typeof body.meetingsEnabled === "boolean" ? body.meetingsEnabled : undefined,
     });
   }
   return new Response(null, { status: 204 });
